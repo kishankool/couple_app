@@ -3,7 +3,7 @@ import Modal from '../components/Modal'
 import Button from '../components/Button'
 import WhoSelector from '../components/WhoSelector'
 import ImageUpload from '../components/ImageUpload'
-import { fsAdd, fsDelete, fsListen, uploadImage } from '../firebase'
+import { fsAdd, fsDelete, fsListen, uploadImageCloudinary } from '../firebase'
 import { WhoContext, ToastContext } from '../App'
 
 export default function Updates() {
@@ -40,7 +40,7 @@ export default function Updates() {
     if (!pFile) return showToast('Pick a photo first 📷')
     setPSaving(true)
     try {
-      const imgUrl = await uploadImage(pFile, `photos/${Date.now()}_${pFile.name}`)
+      const imgUrl = await uploadImageCloudinary(pFile)
       await fsAdd('photos', {
         who: pWho,
         caption: pCaption.trim(),

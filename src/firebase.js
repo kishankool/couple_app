@@ -1,10 +1,9 @@
 // src/firebase.js
-// ⚠️  Replace these values with your own Firebase project config
-// Go to: https://console.firebase.google.com → Your project → Project Settings → Your apps → SDK setup
-
 import { initializeApp } from 'firebase/app'
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore'
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
+import {
+  getFirestore, collection, addDoc, deleteDoc, doc,
+  query, orderBy, onSnapshot, updateDoc, serverTimestamp
+} from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -17,15 +16,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 export const db = getFirestore(app)
-export const storage = getStorage(app)
 
-// ─── Firestore helpers ────────────────────────────────────────────────────────
-
-export const fsAdd = (col, data) =>
-  addDoc(collection(db, col), { ...data, createdAt: serverTimestamp() })
-
-export const fsDelete = (col, id) => deleteDoc(doc(db, col, id))
-
+export const fsAdd    = (col, data) => addDoc(collection(db, col), { ...data, createdAt: serverTimestamp() })
+export const fsDelete = (col, id)   => deleteDoc(doc(db, col, id))
 export const fsUpdate = (col, id, data) => updateDoc(doc(db, col, id), data)
 
 export const fsListen = (col, cb, order = 'createdAt') => {
@@ -33,17 +26,16 @@ export const fsListen = (col, cb, order = 'createdAt') => {
   return onSnapshot(q, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
 }
 
-// ─── Storage helpers ──────────────────────────────────────────────────────────
-
-export const uploadImage = async (file, path) => {
-  const storageRef = ref(storage, path)
-  await uploadBytes(storageRef, file)
-  return getDownloadURL(storageRef)
-}
-
-export const deleteImage = async (url) => {
-  try {
-    const fileRef = ref(storage, url)
-    await deleteObject(fileRef)
-  } catch {}
+// Cloudinary upload — free tier, no payment needed
+// Setup: cloudinary.com → free signup → Settings → Upload → Upload Presets → Add preset → Unsigned
+export const uploadImageCloudinary = async (file) => {
+  const cloudName    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
+  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('upload_preset', uploadPreset)
+  const res  = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: formData })
+  if (!res.ok) throw new Error('Cloudinary upload failed')
+  const data = await res.json()
+  return data.secure_url
 }

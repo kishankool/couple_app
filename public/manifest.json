@@ -1,0 +1,18 @@
+{
+  "name": "Kishan & Aditi 💕",
+  "short_name": "Our App",
+  "description": "Our private couples app",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fef9f5",
+  "theme_color": "#6d3f52",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/heart.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,129 +1,88 @@
-# 💕 Kishan & Aditi — Couple App
+# 💕 Kishan & Aditi — Couple App v2
 
-A beautiful, real-time shared couples app. Both of you see the same data instantly!
-
----
-
-## 🚀 How to Deploy (Step-by-Step)
-
-### Step 1 — Create a Firebase Project
-
-1. Go to **https://console.firebase.google.com**
-2. Click **"Add project"** → name it `kishan-aditi-app` → click through
-3. Once created, click **"Web"** icon (`</>`) to add a web app
-4. Name it anything → click **"Register app"**
-5. You'll see a `firebaseConfig` object — **copy those values**, you'll need them in Step 3
+A beautiful, real-time shared couples app with lock screen, polaroid memories, live countdowns, and more.
 
 ---
 
-### Step 2 — Enable Firebase Services
+## 🚀 Deploy Guide
 
-In your Firebase project:
+### Step 1 — Firebase (for notes, moods, todos, etc.)
 
-#### Firestore Database
-1. Left sidebar → **"Firestore Database"** → **"Create database"**
-2. Choose **"Start in test mode"** → select your region → Done
+1. Go to **https://console.firebase.google.com** → Create project → name it `kishan-aditi`
+2. Click the `</>` Web icon → Register app → copy the `firebaseConfig` values
+3. Left sidebar → **Firestore Database** → Create database → **Start in test mode** → Done
+4. *(No need to enable Storage — photos go to Cloudinary)*
 
-#### Storage (for photos)
-1. Left sidebar → **"Storage"** → **"Get started"**
-2. Choose **"Start in test mode"** → Done
+### Step 2 — Cloudinary (FREE photo hosting — no payment needed)
 
-> ⚠️ "Test mode" means anyone with the URL can read/write. Since this is a private couples app, this is fine. You can tighten rules later.
+1. Go to **https://cloudinary.com** → Sign up free (just email, no card)
+2. On your Dashboard you'll see your **Cloud name** (e.g. `dxyz1234`) — copy it
+3. Click top-right **Settings (⚙️)** → **Upload tab** → scroll to **Upload Presets**
+4. Click **"Add upload preset"** → set Signing mode to **"Unsigned"** → give it a name like `couple_app` → Save
+5. Copy that preset name
 
----
+### Step 3 — Create .env.local
 
-### Step 3 — Set Up Environment Variables
-
-1. In this project folder, copy `.env.example` to a new file called **`.env.local`**
-2. Fill in your Firebase values from Step 1:
+Copy `.env.example` to `.env.local` and fill in:
 
 ```
 VITE_FIREBASE_API_KEY=AIzaSy...
-VITE_FIREBASE_AUTH_DOMAIN=kishan-aditi-app.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=kishan-aditi-app
-VITE_FIREBASE_STORAGE_BUCKET=kishan-aditi-app.appspot.com
+VITE_FIREBASE_AUTH_DOMAIN=kishan-aditi.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=kishan-aditi
+VITE_FIREBASE_STORAGE_BUCKET=kishan-aditi.appspot.com
 VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
-VITE_FIREBASE_APP_ID=1:123456789:web:abc123
+VITE_FIREBASE_APP_ID=1:123...web:abc...
+
+VITE_CLOUDINARY_CLOUD_NAME=dxyz1234
+VITE_CLOUDINARY_UPLOAD_PRESET=couple_app
 ```
 
----
-
 ### Step 4 — Push to GitHub
-
-1. Create a new repo on **https://github.com** (name it `couple-app`)
-2. In this folder, run:
 
 ```bash
 git init
 git add .
-git commit -m "Initial commit 💕"
+git commit -m "💕 Kishan & Aditi app"
 git branch -M main
 git remote add origin https://github.com/YOUR_USERNAME/couple-app.git
 git push -u origin main
 ```
 
----
+### Step 5 — Deploy on Vercel
 
-### Step 5 — Deploy to Vercel
+1. **https://vercel.com** → Add New Project → Import your GitHub repo
+2. Framework auto-detected as **Vite** ✅
+3. Click **"Environment Variables"** → add all 8 vars from `.env.local`
+4. Click **Deploy** 🚀
 
-1. Go to **https://vercel.com** → Sign up / log in with GitHub
-2. Click **"Add New Project"** → Import your `couple-app` repo
-3. Framework will auto-detect as **Vite** ✅
-4. Before deploying, click **"Environment Variables"** and add all 6 Firebase vars from your `.env.local`
-5. Click **"Deploy"** 🚀
-
-In ~2 minutes you'll get a live URL like `https://couple-app-xyz.vercel.app`
-
-**Share that link with Aditi — you'll both see the same notes, photos, and memories in real-time!** 💕
+Share the live URL with Aditi — you'll both see the same data in real-time! 💕
 
 ---
 
-## 💻 Run Locally (for testing)
+## 🔒 Lock Screen
 
-```bash
-npm install
-npm run dev
-```
+The app is protected. The answer to enter is: **21 april 2025**
 
-Open http://localhost:5173
+Only you two know this! Multiple date formats are accepted.
 
 ---
 
 ## ✨ Features
 
-| Feature | Description |
+| Feature | Details |
 |---|---|
+| 🔒 Lock Screen | Secret answer gate — only you two can enter |
 | 🕐 Live Timer | Counts every second since April 21, 2025 |
-| 💌 Love Notes | Write & read each other's messages in real-time |
-| 📸 Memories | Upload photos with titles & dates |
-| 🤳 Photo Updates | Daily selfies/snapshots with captions |
-| 📍 Location Sharing | Share where you are (GPS or manual) |
-| ✅ Shared To-dos | Add, tick off, and delete shared tasks |
-| 🌹 Date Ideas | Built-in + custom date ideas |
-| 🎉 Countdowns | Add events with live countdown |
-| 🌸 Mood Tracker | Log daily moods, see each other's feelings |
-| 📊 Relationship Stats | Days, weeks, months together |
+| 💌 Love Notes | Real-time shared messages |
+| 📸 Polaroid Memories | Beautiful polaroid wall with handwritten fonts, tilts & captions |
+| 🤳 Photo Updates | Daily selfies with Cloudinary hosting |
+| 📍 Location Sharing | Share where you are with GPS auto-detect |
+| ✅ Shared To-dos | Check off tasks together |
+| 🌹 Date Ideas | Built-in + add/delete custom ideas |
+| 🎉 Countdowns | Easy day/month/year entry, sorted by soonest |
+| 🌸 Mood Tracker | Daily moods with history |
+| 📊 Relationship Stats | Years, months, weeks, days, hours, minutes, seconds live counter |
 | ✨ Daily Quote | Rotating love quotes |
-| 🌸 Floating Petals | Romantic animated background |
-
----
-
-## 🔒 Making it More Secure (Optional)
-
-After you're happy with the app, update Firestore rules in Firebase Console → Firestore → Rules:
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true; // Keep for private use
-    }
-  }
-}
-```
-
-For extra security, you could add Firebase Authentication so only you two can log in.
 
 ---
 

@@ -42,7 +42,7 @@ export default function Todos() {
   const done = todos.filter(t => t.done)
 
   return (
-    <div style={{ padding: '18px 16px' }} className="fade-up">
+    <div style={{ padding: '18px 16px' }}>
       <div style={styles.header}>
         <div>
           <div style={styles.pageTitle}>✅ Our To-dos</div>

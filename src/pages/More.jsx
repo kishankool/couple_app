@@ -8,20 +8,20 @@ import { ToastContext } from '../App'
 const ANNIVERSARY = new Date('2025-04-21T00:00:00')
 
 const DEFAULT_IDEAS = [
-  { name: 'Candlelight dinner at home', desc: 'Cook together by candlelight',    icon: '🕯️', tag: 'romantic',  isDefault: true },
-  { name: 'Sunset walk',                desc: 'Catch the golden hour together',  icon: '🌅', tag: 'outdoor',   isDefault: true },
-  { name: 'Movie marathon night',       desc: 'Pick a genre & make popcorn',     icon: '🎬', tag: 'indoor',    isDefault: true },
-  { name: 'Surprise road trip',         desc: 'Drive somewhere new together',    icon: '🚗', tag: 'adventure', isDefault: true },
-  { name: 'Picnic in the park',         desc: 'Pack snacks & enjoy nature',      icon: '🧺', tag: 'outdoor',   isDefault: true },
-  { name: 'Cook a new recipe together', desc: "Try something neither has made",  icon: '👨‍🍳', tag: 'foodie',    isDefault: true },
+  { name: 'Candlelight dinner at home', desc: 'Cook together by candlelight', icon: '🕯️', tag: 'romantic', isDefault: true },
+  { name: 'Sunset walk', desc: 'Catch the golden hour together', icon: '🌅', tag: 'outdoor', isDefault: true },
+  { name: 'Movie marathon night', desc: 'Pick a genre & make popcorn', icon: '🎬', tag: 'indoor', isDefault: true },
+  { name: 'Surprise road trip', desc: 'Drive somewhere new together', icon: '🚗', tag: 'adventure', isDefault: true },
+  { name: 'Picnic in the park', desc: 'Pack snacks & enjoy nature', icon: '🧺', tag: 'outdoor', isDefault: true },
+  { name: 'Cook a new recipe together', desc: "Try something neither has made", icon: '👨‍🍳', tag: 'foodie', isDefault: true },
 ]
 
 const TAG_COLORS = {
-  romantic:  { bg: '#fde8ef', color: '#a04060' },
-  outdoor:   { bg: '#e8f5e9', color: '#2e7d32' },
-  indoor:    { bg: '#e3f2fd', color: '#1565c0' },
+  romantic: { bg: '#fde8ef', color: '#a04060' },
+  outdoor: { bg: '#e8f5e9', color: '#2e7d32' },
+  indoor: { bg: '#e3f2fd', color: '#1565c0' },
   adventure: { bg: '#fff3e0', color: '#e65100' },
-  foodie:    { bg: '#fce4ec', color: '#880e4f' },
+  foodie: { bg: '#fce4ec', color: '#880e4f' },
 }
 
 function liveCountdown(dateStr) {
@@ -31,10 +31,10 @@ function liveCountdown(dateStr) {
   const h = Math.floor((diff % 86400000) / 3600000)
   const m = Math.floor((diff % 3600000) / 60000)
   let text = ''
-  if (d > 0)      text = `${d} day${d !== 1 ? 's' : ''}`
+  if (d > 0) text = `${d} day${d !== 1 ? 's' : ''}`
   else if (h > 0) text = `${h} hr${h !== 1 ? 's' : ''} ${m} min`
   else if (m > 0) text = `${m} min`
-  else            text = 'Any moment now! 🎉'
+  else text = 'Any moment now! 🎉'
   return { text, past: false }
 }
 
@@ -46,21 +46,21 @@ function RelStats() {
     return () => clearInterval(id)
   }, [])
 
-  const diff   = Date.now() - ANNIVERSARY.getTime()
-  const secs   = Math.floor(diff / 1000)
-  const mins   = Math.floor(diff / 60000)
-  const hours  = Math.floor(diff / 3600000)
-  const days   = Math.floor(diff / 86400000)
-  const weeks  = Math.floor(days / 7)
+  const diff = Date.now() - ANNIVERSARY.getTime()
+  const secs = Math.floor(diff / 1000)
+  const mins = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+  const weeks = Math.floor(days / 7)
   const months = Math.floor(days / 30.44)
-  const years  = (diff / (365.25 * 24 * 3600000)).toFixed(2)
+  const years = (diff / (365.25 * 24 * 3600000)).toFixed(2)
 
   const rows = [
-    ['Years together',   `${years} yrs 🥂`],
-    ['Months together',  `${months} months`],
-    ['Weeks together',   `${weeks} weeks`],
-    ['Days together',    `${days} days 💕`],
-    ['Hours together',   `${hours.toLocaleString()} hrs`],
+    ['Years together', `${years} yrs 🥂`],
+    ['Months together', `${months} months`],
+    ['Weeks together', `${weeks} weeks`],
+    ['Days together', `${days} days 💕`],
+    ['Hours together', `${hours.toLocaleString()} hrs`],
     ['Minutes together', `${mins.toLocaleString()} mins`],
     ['Seconds together', `${secs.toLocaleString()} secs ✨`],
   ]
@@ -81,25 +81,25 @@ function RelStats() {
 export default function More() {
   const showToast = useContext(ToastContext)
 
-  const [ideas,  setIdeas]  = useState([])
+  const [ideas, setIdeas] = useState([])
   const [events, setEvents] = useState([])
-  const [moods,  setMoods]  = useState([])
+  const [moods, setMoods] = useState([])
 
   // Modal open state
-  const [ideaOpen,  setIdeaOpen]  = useState(false)
+  const [ideaOpen, setIdeaOpen] = useState(false)
   const [eventOpen, setEventOpen] = useState(false)
 
   // Date idea form
   const [iName, setIName] = useState('')
   const [iDesc, setIDesc] = useState('')
   const [iIcon, setIIcon] = useState('')
-  const [iTag,  setITag]  = useState('romantic')
+  const [iTag, setITag] = useState('romantic')
   const [iSaving, setISaving] = useState(false)
 
   // Event / countdown form — now uses native date + time pickers
-  const [eName,   setEName]   = useState('')
-  const [eDate,   setEDate]   = useState('')      // "2026-04-21"
-  const [eTime,   setETime]   = useState('12:00') // "14:30"
+  const [eName, setEName] = useState('')
+  const [eDate, setEDate] = useState('')      // "2026-04-21"
+  const [eTime, setETime] = useState('12:00') // "14:30"
   const [eSaving, setESaving] = useState(false)
 
   // ── Firestore listeners ───────────────────────────────────────────────────
@@ -107,13 +107,13 @@ export default function More() {
   // Firestore index isn't ready yet. Events are sorted client-side.
   useEffect(() => {
     let u1, u2, u3
-    try { u1 = fsListen('date_ideas', d => setIdeas(d)) }       catch {}
-    try { u2 = fsListen('events',     d => setEvents(d)) }      catch {}
-    try { u3 = fsListen('moods',      d => setMoods(d)) }       catch {}
+    try { u1 = fsListen('date_ideas', d => setIdeas(d)) } catch { }
+    try { u2 = fsListen('events', d => setEvents(d)) } catch { }
+    try { u3 = fsListen('moods', d => setMoods(d)) } catch { }
     return () => {
-      try { u1 && u1() } catch {}
-      try { u2 && u2() } catch {}
-      try { u3 && u3() } catch {}
+      try { u1 && u1() } catch { }
+      try { u2 && u2() } catch { }
+      try { u3 && u3() } catch { }
     }
   }, [])
 
@@ -126,7 +126,7 @@ export default function More() {
         name: iName.trim(),
         desc: iDesc.trim(),
         icon: iIcon.trim() || '🌸',
-        tag:  iTag,
+        tag: iTag,
       })
       setIName(''); setIDesc(''); setIIcon(''); setITag('romantic')
       setIdeaOpen(false)
@@ -141,7 +141,7 @@ export default function More() {
   // ── Save countdown event ──────────────────────────────────────────────────
   const saveEvent = async () => {
     if (!eName.trim()) return showToast('Enter an event name 🎉')
-    if (!eDate)        return showToast('Pick a date 📅')
+    if (!eDate) return showToast('Pick a date 📅')
     const d = new Date(`${eDate}T${eTime || '12:00'}`)
     if (isNaN(d.getTime())) return showToast('Invalid date — try again')
     setESaving(true)
@@ -169,13 +169,13 @@ export default function More() {
   // Preview label for the event form
   const eventPreview = eDate
     ? new Date(`${eDate}T${eTime || '12:00'}`).toLocaleString('en-IN', {
-        weekday: 'short', day: 'numeric', month: 'long',
-        year: 'numeric', hour: '2-digit', minute: '2-digit',
-      })
+      weekday: 'short', day: 'numeric', month: 'long',
+      year: 'numeric', hour: '2-digit', minute: '2-digit',
+    })
     : null
 
   return (
-    <div style={{ padding: '18px 16px' }} className="fade-up">
+    <div style={{ padding: '18px 16px' }}>
 
       {/* ── Date Ideas ────────────────────────────────── */}
       <Card>
@@ -405,6 +405,6 @@ const S = {
     display: 'flex', alignItems: 'center', gap: 12,
     padding: '8px 0', borderBottom: '1px solid var(--border)',
   },
-  moodWho:  { fontWeight: 700, fontSize: '0.85rem', color: 'var(--mauve-deep)' },
+  moodWho: { fontWeight: 700, fontSize: '0.85rem', color: 'var(--mauve-deep)' },
   moodWhen: { fontSize: '0.72rem', color: 'var(--text-light)' },
 }

@@ -47,7 +47,7 @@ export default function Notes() {
   }
 
   return (
-    <div style={{ padding: '18px 16px' }} className="fade-up">
+    <div style={{ padding: '18px 16px' }}>
       <div style={styles.header}>
         <div>
           <div style={styles.pageTitle}>💌 Love Notes</div>

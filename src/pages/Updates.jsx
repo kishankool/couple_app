@@ -95,7 +95,7 @@ export default function Updates() {
   }
 
   return (
-    <div style={{ padding: '18px 16px' }} className="fade-up">
+    <div style={{ padding: '18px 16px' }}>
       {/* Photo Updates */}
       <div style={styles.header}>
         <div>

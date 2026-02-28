@@ -1,26 +1,27 @@
 import React, { useState, useEffect } from 'react'
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
-import Home      from './pages/Home'
-import Notes     from './pages/Notes'
-import Memories  from './pages/Memories'
-import Updates   from './pages/Updates'
-import Todos     from './pages/Todos'
-import More      from './pages/More'
-import Petals    from './components/Petals'
-import Toast     from './components/Toast'
-import Modal     from './components/Modal'
+import { AnimatePresence, motion } from 'framer-motion'
+import Home from './pages/Home'
+import Notes from './pages/Notes'
+import Memories from './pages/Memories'
+import Updates from './pages/Updates'
+import Todos from './pages/Todos'
+import More from './pages/More'
+import Petals from './components/Petals'
+import Toast from './components/Toast'
+import Modal from './components/Modal'
 import LockScreen from './components/LockScreen'
 
 export const ToastContext = React.createContext(null)
-export const WhoContext   = React.createContext(null)
+export const WhoContext = React.createContext(null)
 
 const NAV = [
-  { path: '/',         icon: '🏠', label: 'Home'     },
-  { path: '/notes',    icon: '💌', label: 'Notes'    },
+  { path: '/', icon: '🏠', label: 'Home' },
+  { path: '/notes', icon: '💌', label: 'Notes' },
   { path: '/memories', icon: '📸', label: 'Memories' },
-  { path: '/updates',  icon: '🤳', label: 'Updates'  },
-  { path: '/todos',    icon: '✅', label: 'Todos'    },
-  { path: '/more',     icon: '🌹', label: 'More'     },
+  { path: '/updates', icon: '🤳', label: 'Updates' },
+  { path: '/todos', icon: '✅', label: 'Todos' },
+  { path: '/more', icon: '🌹', label: 'More' },
 ]
 
 // Bell button — requests notification permission
@@ -63,14 +64,27 @@ function NotificationBell() {
   )
 }
 
+function PageWrapper({ children }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
 export default function App() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [toast,        setToast]        = useState(null)
-  const [who,          setWhoState]     = useState(() => localStorage.getItem('ka_who') || 'Kishan')
+  const [toast, setToast] = useState(null)
+  const [who, setWhoState] = useState(() => localStorage.getItem('ka_who') || 'Kishan')
   const [showWhoModal, setShowWhoModal] = useState(false)
-  const [unlocked,     setUnlocked]     = useState(() => sessionStorage.getItem('ka_unlocked') === '1')
+  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem('ka_unlocked') === '1')
 
   const showToast = (msg) => {
     setToast(msg)
@@ -115,15 +129,17 @@ export default function App() {
           </header>
 
           {/* ── Pages ── */}
-          <main style={{ flex: 1, paddingBottom: 70 }}>
-            <Routes>
-              <Route path="/"         element={<Home />}     />
-              <Route path="/notes"    element={<Notes />}    />
-              <Route path="/memories" element={<Memories />} />
-              <Route path="/updates"  element={<Updates />}  />
-              <Route path="/todos"    element={<Todos />}    />
-              <Route path="/more"     element={<More />}     />
-            </Routes>
+          <main style={{ flex: 1, paddingBottom: 70, position: 'relative' }}>
+            <AnimatePresence mode="wait">
+              <Routes location={location} key={location.pathname}>
+                <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
+                <Route path="/notes" element={<PageWrapper><Notes /></PageWrapper>} />
+                <Route path="/memories" element={<PageWrapper><Memories /></PageWrapper>} />
+                <Route path="/updates" element={<PageWrapper><Updates /></PageWrapper>} />
+                <Route path="/todos" element={<PageWrapper><Todos /></PageWrapper>} />
+                <Route path="/more" element={<PageWrapper><More /></PageWrapper>} />
+              </Routes>
+            </AnimatePresence>
           </main>
 
           {/* ── Bottom Nav ── */}
@@ -137,7 +153,7 @@ export default function App() {
                   </span>
                   <span style={{
                     fontSize: '0.58rem', textTransform: 'uppercase', letterSpacing: '0.5px',
-                    color:      active ? 'var(--mauve-deep)' : 'var(--text-light)',
+                    color: active ? 'var(--mauve-deep)' : 'var(--text-light)',
                     fontWeight: active ? 700 : 400,
                   }}>
                     {n.label}

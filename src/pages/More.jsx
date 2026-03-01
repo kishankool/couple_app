@@ -236,7 +236,9 @@ export default function More() {
                   <span style={{ ...S.tag, background: tc.bg, color: tc.color }}>{d.tag}</span>
                   {!d.isDefault && d.id && (
                     <button
+                      type="button"
                       style={S.delBtn}
+                      aria-label={`Delete date idea: ${d.name}`}
                       onClick={() => fsDelete('date_ideas', d.id).then(() => showToast('Removed 🌹')).catch(() => showToast('Error'))}
                     >🗑</button>
                   )}
@@ -263,7 +265,9 @@ export default function More() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                     <div style={S.eventName}>{e.name}</div>
                     <button
+                      type="button"
                       style={S.delBtn}
+                      aria-label={`Delete countdown: ${e.name}`}
                       onClick={() => fsDelete('events', e.id).then(() => showToast('Removed')).catch(() => showToast('Error'))}
                     >🗑</button>
                   </div>
@@ -379,7 +383,7 @@ export default function More() {
           type="date"
           value={eDate}
           onChange={e => setEDate(e.target.value)}
-          min={new Date().toISOString().split('T')[0]}
+          min={new Date().toLocaleDateString('en-CA')}
           style={{ marginBottom: 12 }}
         />
 

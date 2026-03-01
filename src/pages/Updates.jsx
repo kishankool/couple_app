@@ -179,7 +179,7 @@ export default function Updates() {
                     <div style={styles.photoMeta}>
                       {p.who === 'Kishan' ? '💙' : '🌸'} {p.who} · {p.date}
                     </div>
-                    <button style={styles.delBtn} onClick={() => delPhoto(p.id)} title="Delete">🗑</button>
+                    <button type="button" style={styles.delBtn} onClick={() => delPhoto(p.id)} title="Delete" aria-label={`Delete photo ${p.caption || ''}`}>🗑</button>
                   </div>
                 </div>
               ))}
@@ -207,7 +207,7 @@ export default function Updates() {
                     {l.note && <div style={{ ...styles.locAddr, color: 'var(--mauve)', marginTop: 4, fontStyle: 'italic' }}>"{l.note}"</div>}
                     <div style={styles.locWhen}>{l.who === 'Kishan' ? '💙' : '🌸'} {l.who} · {l.date}</div>
                   </div>
-                  <button style={{ ...styles.delBtn, position: 'static', padding: 8 }} onClick={() => delLocation(l.id)} title="Delete">🗑</button>
+                  <button type="button" style={{ ...styles.delBtn, position: 'static', padding: 8 }} onClick={() => delLocation(l.id)} title="Delete" aria-label={`Delete location ${l.name || ''}`}>🗑</button>
                 </div>
               ))}
             </div>
@@ -306,7 +306,7 @@ const styles = {
     right: 0,
     background: 'linear-gradient(transparent, rgba(0,0,0,0.3))',
     padding: '20px 8px 8px',
-    opacity: 0,
+    opacity: 1,
     transition: 'opacity 0.2s',
   },
   photoOverlayText: {

@@ -3,7 +3,8 @@ import Modal from '../components/Modal'
 import Button from '../components/Button'
 import ImageUpload from '../components/ImageUpload'
 import { fsAdd, fsDelete, fsListen, uploadImageCloudinary } from '../firebase'
-import { ToastContext, RoleContext } from '../App'
+import { ToastContext, RoleContext, WhoContext } from '../App'
+import { notifyPartner } from '../push'
 
 /* ─── Constants ─── */
 const JOURNEY_KEY = 'ka_memory_journey_seen'
@@ -256,6 +257,7 @@ function JourneyControls({ current, total, isPlaying, onPlay, onPause, onPrev, o
 export default function Memories() {
   const showToast = useContext(ToastContext)
   const { isVisitor } = useContext(RoleContext)
+  const { who } = useContext(WhoContext)
   const [memories, setMemories] = useState([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -369,6 +371,11 @@ export default function Memories() {
       resetForm()
       setOpen(false)
       showToast('Memory saved! 📸')
+      notifyPartner(who, {
+        title: '📸 New Memory Added!',
+        body: `${who} added a new memory to your timeline — check it out!`,
+        url: '/memories'
+      })
     } catch (e) {
       console.error(e)
       showToast('Error saving memory')

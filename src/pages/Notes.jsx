@@ -4,6 +4,7 @@ import Button from '../components/Button'
 import WhoSelector from '../components/WhoSelector'
 import { fsAdd, fsDelete, fsListen } from '../firebase'
 import { WhoContext, ToastContext } from '../App'
+import { notifyPartner } from '../push'
 
 export default function Notes() {
   const { who } = useContext(WhoContext)
@@ -35,6 +36,11 @@ export default function Notes() {
       setText('')
       setOpen(false)
       showToast('Love note sent! 💌')
+      notifyPartner(from, {
+        title: '💌 You received a love note!',
+        body: `Open the app to read what ${from} wrote for you 🌸`,
+        url: '/notes'
+      })
     } catch { showToast('Error saving note') }
     setSaving(false)
   }

@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
 
-// Hash a string using SHA-256 (returns hex string)
+// Hash a string using SHA-256 (returns hex string, case-sensitive)
 async function sha256(text) {
   const encoder = new TextEncoder()
-  const data = encoder.encode(text.trim().toLowerCase())
+  const data = encoder.encode(text.trim())
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)
   return Array.from(new Uint8Array(hashBuffer))
     .map(b => b.toString(16).padStart(2, '0'))
@@ -26,16 +26,16 @@ export default function LockScreen({ onUnlock }) {
   const notConfigured = !STORED_HASH
 
   const tryUnlock = async () => {
-    if (!val.trim() || checking) return
-    setChecking(true)
-
+    // Fast-path: no passphrase configured yet — let owner in immediately
     if (notConfigured) {
-      // No passphrase set — let owner in and show setup instructions
       sessionStorage.setItem('ka_unlocked', '1')
       sessionStorage.setItem('ka_role', 'owner')
       onUnlock('owner')
       return
     }
+
+    if (!val.trim() || checking) return
+    setChecking(true)
 
     const inputHash = await sha256(val)
     if (inputHash === STORED_HASH) {

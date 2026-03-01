@@ -16,7 +16,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 const rl = createInterface({ input: process.stdin, output: process.stdout })
 
 function sha256(text) {
-  return createHash('sha256').update(text.trim().toLowerCase()).digest('hex')
+  return createHash('sha256').update(text.trim()).digest('hex')
 }
 
 console.log('\n💕 Kishan & Aditi — Passphrase Setup\n')

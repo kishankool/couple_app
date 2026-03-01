@@ -79,7 +79,7 @@ export default function Home() {
       unsubs.push(fsListen('updates_photos', d => setStats(s => ({ ...s, photos: d.length }))))
       unsubs.push(fsListen('updates_locations', d => setStats(s => ({ ...s, locations: d.length }))))
     }
-    return () => unsubs.forEach(u => u())
+    return () => unsubs.forEach(u => { u() })
   }, [isVisitor])
 
   const logMood = async (emoji) => {

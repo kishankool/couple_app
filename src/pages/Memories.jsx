@@ -8,17 +8,17 @@ import { ToastContext } from '../App'
 export default function Memories() {
   const showToast = useContext(ToastContext)
   const [memories, setMemories] = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [open,     setOpen]     = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState(null)
 
   // Form state
-  const [title,   setTitle]   = useState('')
+  const [title, setTitle] = useState('')
   const [caption, setCaption] = useState('')
-  const [date,    setDate]    = useState('')
-  const [file,    setFile]    = useState(null)
+  const [date, setDate] = useState('')
+  const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
-  const [saving,  setSaving]  = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     const unsub = fsListen('memories', data => { setMemories(data); setLoading(false) })
@@ -34,11 +34,11 @@ export default function Memories() {
       let imgUrl = null
       if (file) imgUrl = await uploadImageCloudinary(file)
       await fsAdd('memories', {
-        title:   title.trim(),
+        title: title.trim(),
         caption: caption.trim(),
-        date:    date || new Date().toISOString().split('T')[0],
+        date: date || new Date().toISOString().split('T')[0],
         imgUrl,
-        rotate:  (Math.random() * 6 - 3).toFixed(2),   // random tilt for polaroid feel
+        rotate: (Math.random() * 6 - 3).toFixed(2),   // random tilt for polaroid feel
       })
       setTitle(''); setCaption(''); setDate(''); setFile(null); setPreview(null)
       setOpen(false)
@@ -57,7 +57,7 @@ export default function Memories() {
   }
 
   return (
-    <div style={{ padding: '18px 16px' }} className="fade-up">
+    <div style={{ padding: '18px 16px' }}>
 
 
       <div style={styles.header}>
@@ -121,9 +121,9 @@ export default function Memories() {
 }
 
 function PolaroidCard({ memory: m, index, onClick, onDelete }) {
-  const rotate  = parseFloat(m.rotate || 0)
+  const rotate = parseFloat(m.rotate || 0)
   const bgTints = ['#fffdf5', '#fdf5ff', '#f5fff8', '#fff5f5', '#f5f8ff']
-  const tint    = bgTints[index % bgTints.length]
+  const tint = bgTints[index % bgTints.length]
 
   return (
     <div
@@ -160,9 +160,9 @@ function formatDate(d) {
 }
 
 const styles = {
-  header:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   pageTitle: { fontFamily: "'Playfair Display', serif", fontSize: '1.05rem', color: 'var(--mauve-deep)' },
-  pageSub:   { fontSize: '0.75rem', color: 'var(--text-light)', marginTop: 2 },
+  pageSub: { fontSize: '0.75rem', color: 'var(--text-light)', marginTop: 2 },
 
   // Polaroid wall — masonry-ish two-column
   wall: {

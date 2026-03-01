@@ -80,14 +80,14 @@ export default function Home() {
   }
 
   return (
-    <div style={{ padding: '18px 16px 10px' }} className="fade-up">
+    <div style={{ padding: '18px 16px 10px' }}>
       {/* Hero Banner */}
       <div style={styles.hero}>
         <div style={{ position: 'absolute', top: 12, right: 16, fontSize: '1.1rem', opacity: 0.3, letterSpacing: 8 }}>❀ ✿ ❁</div>
         <div style={styles.heroNames}>Kishan & Aditi</div>
         <div style={styles.heroSince}>Together since April 21, 2025</div>
         <div style={styles.timerGrid}>
-          {[['Days', time.days], ['Hours', time.hours], ['Mins', String(time.mins).padStart(2,'0')], ['Secs', String(time.secs).padStart(2,'0')]].map(([lbl, val]) => (
+          {[['Days', time.days], ['Hours', time.hours], ['Mins', String(time.mins).padStart(2, '0')], ['Secs', String(time.secs).padStart(2, '0')]].map(([lbl, val]) => (
             <div key={lbl} style={styles.timerUnit}>
               <span style={styles.timerNum}>{val}</span>
               <span style={styles.timerLbl}>{lbl}</span>

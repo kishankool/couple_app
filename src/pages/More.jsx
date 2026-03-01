@@ -3,7 +3,7 @@ import Card, { CardTitle } from '../components/Card'
 import Modal from '../components/Modal'
 import Button from '../components/Button'
 import { fsAdd, fsDelete, fsListen } from '../firebase'
-import { ToastContext } from '../App'
+import { ToastContext, RoleContext } from '../App'
 
 const ANNIVERSARY = new Date('2025-04-21T00:00:00')
 
@@ -86,7 +86,8 @@ function RelStats() {
 
 export default function More() {
   const showToast = useContext(ToastContext)
-  const [activeTab, setActiveTab] = useState('ideas')
+  const { isVisitor } = useContext(RoleContext)
+  const [activeTab, setActiveTab] = useState(isVisitor ? 'countdowns' : 'ideas')
 
   const [ideas, setIdeas] = useState([])
   const [events, setEvents] = useState([])
@@ -175,10 +176,16 @@ export default function More() {
     : null
 
   const getAddButton = () => {
+    if (isVisitor) return null
     if (activeTab === 'ideas') return <Button size="sm" onClick={() => setIdeaOpen(true)}>+ Idea</Button>
     if (activeTab === 'countdowns') return <Button size="sm" onClick={() => setEventOpen(true)}>+ Event</Button>
     return null
   }
+
+  // Tabs visible to visitors vs owners
+  const visibleTabs = isVisitor
+    ? MORE_TABS.filter(t => t.key === 'countdowns' || t.key === 'stats')
+    : MORE_TABS
 
   return (
     <div className="page-content">
@@ -193,7 +200,7 @@ export default function More() {
 
       {/* Tab Switcher */}
       <div className="tabs-container">
-        {MORE_TABS.map(tab => (
+        {visibleTabs.map(tab => (
           <button
             key={tab.key}
             id={`more-tab-${tab.key}`}

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Card, { CardTitle } from '../components/Card'
 import Button from '../components/Button'
 import { fsAdd, fsListen } from '../firebase'
-import { WhoContext, ToastContext } from '../App'
+import { WhoContext, ToastContext, RoleContext } from '../App'
 
 const ANNIVERSARY = new Date('2025-04-21T00:00:00')
 
@@ -44,9 +45,11 @@ function useTimer() {
 
 export default function Home() {
   const time = useTimer()
+  const navigate = useNavigate()
   const { who } = useContext(WhoContext)
   const showToast = useContext(ToastContext)
-  const [stats, setStats] = useState({ notes: 0, memories: 0, todos: 0, done: 0 })
+  const { isVisitor } = useContext(RoleContext)
+  const [stats, setStats] = useState({ notes: 0, memories: 0, todos: 0, done: 0, photos: 0, locations: 0 })
   const [todayMoods, setTodayMoods] = useState([])
   const [loggingMood, setLoggingMood] = useState(false)
 
@@ -54,25 +57,33 @@ export default function Home() {
   const quote = QUOTES[dayIdx]
   const today = new Date().toDateString()
 
-  // Listen to moods collection
+  // Listen to moods collection (owners only)
   useEffect(() => {
+    if (isVisitor) return
     const unsub = fsListen('moods', (data) => {
       setTodayMoods(data.filter(m => {
         try { return new Date(m.date).toDateString() === today } catch { return false }
       }))
     })
     return unsub
-  }, [])
+  }, [isVisitor])
 
   // Listen to counts
   useEffect(() => {
-    const u1 = fsListen('notes', d => setStats(s => ({ ...s, notes: d.length })))
+    // Always listen to public collections
     const u2 = fsListen('memories', d => setStats(s => ({ ...s, memories: d.length })))
-    const u3 = fsListen('todos', d => setStats(s => ({ ...s, todos: d.length, done: d.filter(t => t.done).length })))
-    return () => { u1(); u2(); u3() }
-  }, [])
+    const unsubs = [u2]
+    if (!isVisitor) {
+      unsubs.push(fsListen('notes', d => setStats(s => ({ ...s, notes: d.length }))))
+      unsubs.push(fsListen('todos', d => setStats(s => ({ ...s, todos: d.length, done: d.filter(t => t.done).length }))))
+      unsubs.push(fsListen('updates_photos', d => setStats(s => ({ ...s, photos: d.length }))))
+      unsubs.push(fsListen('updates_locations', d => setStats(s => ({ ...s, locations: d.length }))))
+    }
+    return () => unsubs.forEach(u => { u() })
+  }, [isVisitor])
 
   const logMood = async (emoji) => {
+    if (isVisitor) return showToast('Only Kishan & Aditi can do this 🔒')
     setLoggingMood(true)
     try {
       await fsAdd('moods', { who, emoji, date: new Date().toISOString() })
@@ -80,6 +91,18 @@ export default function Home() {
     } catch { showToast('Error saving mood') }
     setLoggingMood(false)
   }
+
+  // Stats for visitors vs owners
+  const publicStats = [
+    ['📸', stats.memories, 'Memories', '/memories'],
+    ['☀️', time.days, 'Days Together', '/'],
+    ['🌹', 2, 'In Love', '/more'],
+  ]
+  const ownerStats = [
+    ['💌', stats.notes, 'Love Notes', '/notes'],
+    ['📸', stats.memories, 'Memories', '/memories'],
+    ['✅', `${stats.done}/${stats.todos}`, 'Todos Done', '/todos'],
+  ]
 
   return (
     <div className="page-content">
@@ -98,14 +121,10 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats — clickable cards */}
       <div style={styles.statsGrid}>
-        {[
-          ['💌', stats.notes, 'Love Notes'],
-          ['📸', stats.memories, 'Memories'],
-          [`✅`, `${stats.done}/${stats.todos}`, 'Todos Done'],
-        ].map(([icon, val, lbl]) => (
-          <div key={lbl} style={styles.statCard}>
+        {(isVisitor ? publicStats : ownerStats).map(([icon, val, lbl, path]) => (
+          <div key={lbl} style={{ ...styles.statCard, cursor: 'pointer' }} onClick={() => navigate(path)}>
             <span style={{ fontSize: '1.4rem' }}>{icon}</span>
             <span style={styles.statNum}>{val}</span>
             <span style={styles.statLbl}>{lbl}</span>
@@ -113,33 +132,42 @@ export default function Home() {
         ))}
       </div>
 
-      {/* Mood */}
-      <Card>
-        <CardTitle icon="🌸">How are you feeling, {who}?</CardTitle>
-        <div style={styles.moodGrid}>
-          {MOODS.map(m => (
-            <button key={m} onClick={() => logMood(m)} disabled={loggingMood} style={styles.moodBtn}>{m}</button>
-          ))}
-        </div>
-        {todayMoods.length > 0 && (
-          <div style={styles.todayMoods}>
-            <div className="section-label">Today's moods</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {todayMoods.map((m, i) => (
-                <span key={i} style={styles.todayMoodItem}>
-                  {m.who === 'Kishan' ? '💙' : '🌸'} {m.who}: {m.emoji}
-                </span>
-              ))}
-            </div>
+      {/* Mood — only for owners */}
+      {!isVisitor && (
+        <Card>
+          <CardTitle icon="🌸">How are you feeling, {who}?</CardTitle>
+          <div style={styles.moodGrid}>
+            {MOODS.map(m => (
+              <button key={m} onClick={() => logMood(m)} disabled={loggingMood} style={styles.moodBtn}>{m}</button>
+            ))}
           </div>
-        )}
-      </Card>
+          {todayMoods.length > 0 && (
+            <div style={styles.todayMoods}>
+              <div className="section-label">Today's moods</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {todayMoods.map((m, i) => (
+                  <span key={i} style={styles.todayMoodItem}>
+                    {m.who === 'Kishan' ? '💙' : '🌸'} {m.who}: {m.emoji}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Quote */}
       <Card>
         <CardTitle icon="✨">Daily Quote</CardTitle>
         <div style={styles.quote}>{quote}</div>
       </Card>
+
+      {/* Visitor info */}
+      {isVisitor && (
+        <div style={styles.visitorInfo}>
+          👀 You're viewing as a visitor. Tap 📸 Memories or 🌹 More to explore!
+        </div>
+      )}
     </div>
   )
 }
@@ -273,5 +301,16 @@ const styles = {
     fontSize: '0.92rem',
     color: 'var(--mauve-deep)',
     lineHeight: 1.7,
+  },
+  visitorInfo: {
+    fontSize: '0.82rem',
+    color: 'var(--mauve)',
+    background: 'linear-gradient(135deg, #fdf0f5, #f5e8ee)',
+    borderRadius: 14,
+    padding: '14px 18px',
+    textAlign: 'center',
+    lineHeight: 1.6,
+    border: '1px solid var(--border)',
+    marginTop: 6,
   },
 }

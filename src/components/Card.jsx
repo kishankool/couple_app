@@ -5,11 +5,12 @@ export default function Card({ children, style }) {
   return (
     <div style={{
       background: 'white',
-      borderRadius: 18,
+      borderRadius: 20,
       padding: '18px',
       marginBottom: 14,
       boxShadow: '0 4px 20px var(--shadow)',
       border: '1px solid var(--border)',
+      transition: 'transform 0.2s',
       ...style
     }}>
       {children}
@@ -21,9 +22,9 @@ export function CardTitle({ children, icon }) {
   return (
     <div style={{
       fontFamily: "'Playfair Display', serif",
-      fontSize: '1rem',
+      fontSize: '1.02rem',
       color: 'var(--mauve-deep)',
-      marginBottom: 12,
+      marginBottom: 14,
       display: 'flex',
       alignItems: 'center',
       gap: 8,

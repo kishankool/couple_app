@@ -42,13 +42,13 @@ export default function Todos() {
   const done = todos.filter(t => t.done)
 
   return (
-    <div style={{ padding: '18px 16px' }}>
+    <div className="page-content">
       <div style={styles.header}>
         <div>
           <div style={styles.pageTitle}>✅ Our To-dos</div>
-          <div style={styles.pageSub}>Things to do together</div>
+          <div style={styles.pageSub}>Things to do together · {pending.length} pending</div>
         </div>
-        <Button size="sm" onClick={() => setOpen(true)}>+ Add</Button>
+        <Button size="sm" onClick={() => { setText(''); setOpen(true) }}>+ Add</Button>
       </div>
 
       {loading ? <div className="loading">🌸</div> : todos.length === 0 ? (
@@ -61,55 +61,73 @@ export default function Todos() {
           {pending.length > 0 && (
             <>
               <div className="section-label">Pending ({pending.length})</div>
-              {pending.map(t => <TodoItem key={t.id} todo={t} onToggle={toggle} onDel={del} />)}
+              {pending.map((t, i) => <TodoItem key={t.id} todo={t} index={i} onToggle={toggle} onDel={del} />)}
             </>
           )}
           {done.length > 0 && (
             <>
               <hr className="divider" />
               <div className="section-label">Done ({done.length}) ✨</div>
-              {done.map(t => <TodoItem key={t.id} todo={t} onToggle={toggle} onDel={del} />)}
+              {done.map((t, i) => <TodoItem key={t.id} todo={t} index={i} onToggle={toggle} onDel={del} />)}
             </>
           )}
         </>
       )}
 
       <Modal open={open} onClose={() => setOpen(false)} title="✅ Add To-do">
-        <input value={text} onChange={e => setText(e.target.value)} placeholder="e.g. Plan a trip to Goa 🏖️" style={{ marginBottom: 12 }} onKeyDown={e => e.key === 'Enter' && add()} />
+        <input value={text} onChange={e => setText(e.target.value)} placeholder="e.g. Plan a trip to Goa 🏖️" style={{ marginBottom: 14 }} onKeyDown={e => e.key === 'Enter' && add()} />
         <Button size="full" onClick={add} disabled={saving}>{saving ? 'Adding…' : 'Add To-do ✨'}</Button>
       </Modal>
     </div>
   )
 }
 
-function TodoItem({ todo, onToggle, onDel }) {
+function TodoItem({ todo, index, onToggle, onDel }) {
   return (
-    <div style={{ ...styles.todoItem, opacity: todo.done ? 0.55 : 1 }}>
+    <div style={{
+      ...styles.todoItem,
+      opacity: todo.done ? 0.55 : 1,
+      animationDelay: `${Math.min(index * 0.04, 0.3)}s`,
+    }}>
       <button onClick={() => onToggle(todo)} style={{ ...styles.check, ...(todo.done ? styles.checkDone : {}) }}>
         {todo.done ? '✓' : ''}
       </button>
-      <span style={{ flex: 1, fontSize: '0.9rem', textDecoration: todo.done ? 'line-through' : 'none' }}>{todo.text}</span>
-      <button style={styles.del} onClick={() => onDel(todo.id)}>🗑</button>
+      <span style={{
+        flex: 1,
+        fontSize: '0.92rem',
+        textDecoration: todo.done ? 'line-through' : 'none',
+        color: todo.done ? 'var(--text-light)' : 'var(--text)',
+        lineHeight: 1.4,
+      }}>{todo.text}</span>
+      <button style={styles.del} onClick={() => onDel(todo.id)} title="Delete">🗑</button>
     </div>
   )
 }
 
 const styles = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  pageTitle: { fontFamily: "'Playfair Display', serif", fontSize: '1.05rem', color: 'var(--mauve-deep)' },
+  pageTitle: { fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', color: 'var(--mauve-deep)' },
   pageSub: { fontSize: '0.75rem', color: 'var(--text-light)', marginTop: 2 },
   todoItem: {
     display: 'flex', alignItems: 'center', gap: 12,
-    padding: '12px 14px', background: 'white', borderRadius: 14,
-    marginBottom: 8, boxShadow: '0 3px 10px var(--shadow)', transition: 'opacity 0.2s',
+    padding: '14px 16px', background: 'white', borderRadius: 16,
+    marginBottom: 8, boxShadow: '0 3px 12px var(--shadow)',
+    transition: 'opacity 0.25s, transform 0.2s',
+    border: '1px solid var(--border)',
+    animation: 'fadeUp 0.3s ease both',
   },
   check: {
-    width: 24, height: 24, borderRadius: '50%',
+    width: 26, height: 26, borderRadius: '50%',
     border: '2px solid var(--rose-dark)', background: 'none',
     cursor: 'pointer', flexShrink: 0, display: 'flex',
     alignItems: 'center', justifyContent: 'center',
-    color: 'white', fontSize: '0.75rem', transition: 'all 0.2s',
+    color: 'white', fontSize: '0.78rem', transition: 'all 0.25s',
+    WebkitTapHighlightColor: 'transparent',
   },
   checkDone: { background: 'var(--rose-dark)', border: '2px solid var(--rose-dark)' },
-  del: { background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '1rem' },
+  del: {
+    background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '1rem',
+    transition: 'color 0.2s',
+    WebkitTapHighlightColor: 'transparent',
+  },
 }

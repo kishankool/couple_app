@@ -2,7 +2,7 @@
 import { initializeApp } from 'firebase/app'
 import {
   getFirestore, collection, addDoc, deleteDoc, doc,
-  query, orderBy, limit, onSnapshot, updateDoc, serverTimestamp
+  query, orderBy, onSnapshot, updateDoc, serverTimestamp
 } from 'firebase/firestore'
 import imageCompression from 'browser-image-compression'
 
@@ -22,13 +22,21 @@ export const fsAdd    = (col, data) => addDoc(collection(db, col), { ...data, cr
 export const fsDelete = (col, id)   => deleteDoc(doc(db, col, id))
 export const fsUpdate = (col, id, data) => updateDoc(doc(db, col, id), data)
 
+// Listen to ALL docs in a collection (no limit)
+// Previously had limit(100) which could block additions if Firestore index wasn't created
 export const fsListen = (col, cb, order = 'createdAt') => {
-  const q = query(collection(db, col), orderBy(order, 'desc'), limit(100))
-  return onSnapshot(q, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+  const q = query(collection(db, col), orderBy(order, 'desc'))
+  return onSnapshot(q, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    (error) => {
+      console.warn(`Firestore listener error on "${col}":`, error.message)
+      // If the index isn't ready yet, fall back to unordered query
+      const fallbackQ = query(collection(db, col))
+      return onSnapshot(fallbackQ, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    }
+  )
 }
 
 // Cloudinary upload — free tier, no payment needed
-// Setup: cloudinary.com → free signup → Settings → Upload → Upload Presets → Add preset → Unsigned
 export const uploadImageCloudinary = async (file) => {
   const cloudName    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
   const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
@@ -48,4 +56,33 @@ export const uploadImageCloudinary = async (file) => {
   if (!res.ok) throw new Error('Cloudinary upload failed')
   const data = await res.json()
   return data.secure_url
+}
+
+// Send in-app notification when partner adds content
+export const sendPartnerNotification = (who, action) => {
+  if (!('Notification' in window)) return
+  if (Notification.permission !== 'granted') return
+  
+  const partnerName = who === 'Kishan' ? 'Kishan' : 'Aditi'
+  
+  const messages = {
+    note: `${partnerName} sent you a love note 💌`,
+    photo: `${partnerName} posted a new photo 🤳`,
+    memory: `${partnerName} added a new memory 📸`,
+    location: `${partnerName} shared their location 📍`,
+    mood: `${partnerName} logged their mood 🌸`,
+    todo: `${partnerName} added a new to-do ✅`,
+  }
+
+  try {
+    new Notification('Kishan & Aditi 💕', {
+      body: messages[action] || `${partnerName} updated something 🌸`,
+      icon: '/heart.svg',
+      tag: `partner-${action}`,
+      renotify: true,
+      silent: false,
+    })
+  } catch (e) {
+    console.warn('Notification failed:', e)
+  }
 }

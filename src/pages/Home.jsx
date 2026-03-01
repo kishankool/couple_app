@@ -57,7 +57,9 @@ export default function Home() {
   // Listen to moods collection
   useEffect(() => {
     const unsub = fsListen('moods', (data) => {
-      setTodayMoods(data.filter(m => new Date(m.date).toDateString() === today))
+      setTodayMoods(data.filter(m => {
+        try { return new Date(m.date).toDateString() === today } catch { return false }
+      }))
     })
     return unsub
   }, [])
@@ -80,10 +82,10 @@ export default function Home() {
   }
 
   return (
-    <div style={{ padding: '18px 16px 10px' }}>
+    <div className="page-content">
       {/* Hero Banner */}
       <div style={styles.hero}>
-        <div style={{ position: 'absolute', top: 12, right: 16, fontSize: '1.1rem', opacity: 0.3, letterSpacing: 8 }}>❀ ✿ ❁</div>
+        <div style={styles.heroDecor}>❀ ✿ ❁</div>
         <div style={styles.heroNames}>Kishan & Aditi</div>
         <div style={styles.heroSince}>Together since April 21, 2025</div>
         <div style={styles.timerGrid}>
@@ -104,7 +106,7 @@ export default function Home() {
           [`✅`, `${stats.done}/${stats.todos}`, 'Todos Done'],
         ].map(([icon, val, lbl]) => (
           <div key={lbl} style={styles.statCard}>
-            <span style={{ fontSize: '1.3rem' }}>{icon}</span>
+            <span style={{ fontSize: '1.4rem' }}>{icon}</span>
             <span style={styles.statNum}>{val}</span>
             <span style={styles.statLbl}>{lbl}</span>
           </div>
@@ -114,17 +116,17 @@ export default function Home() {
       {/* Mood */}
       <Card>
         <CardTitle icon="🌸">How are you feeling, {who}?</CardTitle>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+        <div style={styles.moodGrid}>
           {MOODS.map(m => (
             <button key={m} onClick={() => logMood(m)} disabled={loggingMood} style={styles.moodBtn}>{m}</button>
           ))}
         </div>
         {todayMoods.length > 0 && (
-          <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--petal)', borderRadius: 10 }}>
+          <div style={styles.todayMoods}>
             <div className="section-label">Today's moods</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {todayMoods.map((m, i) => (
-                <span key={i} style={{ fontSize: '0.82rem', color: 'var(--mauve)' }}>
+                <span key={i} style={styles.todayMoodItem}>
                   {m.who === 'Kishan' ? '💙' : '🌸'} {m.who}: {m.emoji}
                 </span>
               ))}
@@ -146,65 +148,129 @@ const styles = {
   hero: {
     background: 'linear-gradient(135deg, var(--mauve-deep) 0%, var(--mauve) 60%, var(--rose-dark) 100%)',
     borderRadius: 24,
-    padding: '26px 20px',
+    padding: '28px 20px',
     textAlign: 'center',
     color: 'white',
     marginBottom: 14,
     position: 'relative',
     overflow: 'hidden',
   },
+  heroDecor: {
+    position: 'absolute',
+    top: 12,
+    right: 16,
+    fontSize: '1.1rem',
+    opacity: 0.2,
+    letterSpacing: 8,
+  },
   heroNames: {
     fontFamily: "'Playfair Display', serif",
-    fontSize: '1.8rem',
+    fontSize: 'clamp(1.5rem, 5vw, 1.9rem)',
     marginBottom: 4,
   },
-  heroSince: { fontSize: '0.72rem', opacity: 0.75, letterSpacing: 2, textTransform: 'uppercase' },
-  timerGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginTop: 18 },
+  heroSince: {
+    fontSize: '0.72rem',
+    opacity: 0.75,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  timerGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap: 8,
+    marginTop: 18,
+  },
   timerUnit: {
     background: 'rgba(255,255,255,0.14)',
-    borderRadius: 12,
-    padding: '10px 6px',
+    borderRadius: 14,
+    padding: '12px 6px',
     backdropFilter: 'blur(4px)',
+    WebkitBackdropFilter: 'blur(4px)',
   },
   timerNum: {
     fontFamily: "'Playfair Display', serif",
-    fontSize: '1.5rem',
+    fontSize: 'clamp(1.2rem, 4vw, 1.6rem)',
     fontWeight: 600,
     display: 'block',
   },
-  timerLbl: { fontSize: '0.55rem', opacity: 0.75, textTransform: 'uppercase', letterSpacing: 1 },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 14 },
+  timerLbl: {
+    fontSize: '0.55rem',
+    opacity: 0.75,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: 10,
+    marginBottom: 14,
+  },
   statCard: {
     background: 'white',
     borderRadius: 16,
-    padding: '12px 8px',
+    padding: '14px 8px',
     textAlign: 'center',
     boxShadow: '0 3px 14px var(--shadow)',
     border: '1px solid var(--border)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
+    transition: 'transform 0.2s',
   },
-  statNum: { fontFamily: "'Playfair Display', serif", fontSize: '1.4rem', color: 'var(--mauve-deep)' },
-  statLbl: { fontSize: '0.65rem', color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: 1 },
+  statNum: {
+    fontFamily: "'Playfair Display', serif",
+    fontSize: 'clamp(1.1rem, 3.5vw, 1.5rem)',
+    color: 'var(--mauve-deep)',
+  },
+  statLbl: {
+    fontSize: '0.62rem',
+    color: 'var(--text-light)',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  moodGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(5, 1fr)',
+    gap: 8,
+    justifyContent: 'center',
+  },
   moodBtn: {
-    fontSize: '1.45rem',
-    padding: '7px 10px',
+    fontSize: '1.5rem',
+    padding: '8px',
     border: '2px solid transparent',
-    borderRadius: 12,
+    borderRadius: 14,
     background: 'var(--blush)',
     cursor: 'pointer',
-    transition: 'all 0.18s',
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    WebkitTapHighlightColor: 'transparent',
+    aspectRatio: '1',
+  },
+  todayMoods: {
+    marginTop: 14,
+    padding: '12px 14px',
+    background: 'var(--petal)',
+    borderRadius: 12,
+  },
+  todayMoodItem: {
+    fontSize: '0.84rem',
+    color: 'var(--mauve)',
+    background: 'white',
+    padding: '4px 10px',
+    borderRadius: 20,
+    border: '1px solid var(--border)',
   },
   quote: {
     background: 'linear-gradient(135deg, #fdf0f5, #f5e8ee)',
     borderLeft: '3px solid var(--rose-dark)',
-    borderRadius: 12,
-    padding: '14px 16px',
+    borderRadius: 14,
+    padding: '16px 18px',
     fontFamily: "'Playfair Display', serif",
     fontStyle: 'italic',
-    fontSize: '0.9rem',
+    fontSize: '0.92rem',
     color: 'var(--mauve-deep)',
     lineHeight: 1.7,
   },

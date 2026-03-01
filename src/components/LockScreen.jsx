@@ -133,7 +133,7 @@ export default function LockScreen({ onUnlock }) {
           View as Visitor 👀
         </button>
 
-        <p style={s.footer}>Only the two of you know the secret 🌹</p>
+        <p style={s.footer}>Only the two of us know the secret 🌹</p>
       </div>
 
       <style>{`

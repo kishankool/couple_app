@@ -1,19 +1,44 @@
 import React, { useState } from 'react'
 
-// The secret answer — April 21 2025
-const SECRET_MONTH = '04'
-const SECRET_DAY = '21'
-const SECRET_YEAR = '2025'
-const CORRECT_VALUE = '2025-04-21'
+// Hash a string using SHA-256 (returns hex string)
+async function sha256(text) {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(text.trim().toLowerCase())
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+// The correct hash lives in .env as VITE_APP_PASSHASH (gitignored — safe for public repos)
+// If not set yet, show a setup prompt
+const STORED_HASH = import.meta.env.VITE_APP_PASSHASH || ''
 
 export default function LockScreen({ onUnlock }) {
   const [val, setVal] = useState('')
   const [shake, setShake] = useState(false)
+  const [checking, setChecking] = useState(false)
   const [attempts, setAttempts] = useState(0)
   const [wrong, setWrong] = useState(false)
+  const [showPass, setShowPass] = useState(false)
 
-  const tryUnlock = () => {
-    if (val === CORRECT_VALUE) {
+  // If no hash is configured yet, show a setup notice
+  const notConfigured = !STORED_HASH
+
+  const tryUnlock = async () => {
+    if (!val.trim() || checking) return
+    setChecking(true)
+
+    if (notConfigured) {
+      // No passphrase set — let owner in and show setup instructions
+      sessionStorage.setItem('ka_unlocked', '1')
+      sessionStorage.setItem('ka_role', 'owner')
+      onUnlock('owner')
+      return
+    }
+
+    const inputHash = await sha256(val)
+    if (inputHash === STORED_HASH) {
       sessionStorage.setItem('ka_unlocked', '1')
       sessionStorage.setItem('ka_role', 'owner')
       onUnlock('owner')
@@ -21,8 +46,9 @@ export default function LockScreen({ onUnlock }) {
       setShake(true)
       setWrong(true)
       setAttempts(a => a + 1)
-      setTimeout(() => setShake(false), 600)
+      setTimeout(() => { setShake(false); setChecking(false) }, 600)
     }
+    setChecking(false)
   }
 
   return (
@@ -32,35 +58,65 @@ export default function LockScreen({ onUnlock }) {
       <div style={{ ...s.card, animation: shake ? 'shakeLock 0.5s ease' : 'fadeUp 0.6s ease' }}>
         <div style={s.hearts}>💕</div>
         <div style={s.lockIcon}>🔒</div>
-        <h1 style={s.title}>Kishan & Aditi</h1>
-        <p style={s.sub}>This is our private space.<br />Answer to enter 🌸</p>
+        <h1 style={s.title}>Kishan &amp; Aditi</h1>
+        <p style={s.sub}>This is our private space.<br />Enter the secret to continue 🌸</p>
 
-        <div style={s.question}>
-          When did our relationship begin?
-        </div>
-
-        <input
-          type="date"
-          value={val}
-          onChange={e => { setVal(e.target.value); setWrong(false) }}
-          onKeyDown={e => e.key === 'Enter' && tryUnlock()}
-          style={{
-            ...s.input,
-            borderColor: wrong ? '#e88080' : 'rgba(200,120,140,0.3)',
-          }}
-          max="2099-12-31"
-        />
-
-        {wrong && (
-          <div style={s.wrongMsg}>
-            {attempts >= 3
-              ? "💡 Hint: It's the day we started 💕"
-              : "That's not right, try again 🌸"}
+        {notConfigured && (
+          <div style={s.setupBanner}>
+            ⚙️ No passphrase set yet — run <code style={s.code}>npm run setup-pass</code> to configure.
+            <br /><br />Tap the button below to enter as owner for now.
           </div>
         )}
 
-        <button style={s.btn} onClick={tryUnlock}>
-          Enter with love 💕
+        {!notConfigured && (
+          <>
+            <div style={s.question}>
+              What's our secret word? 🌹
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPass ? 'text' : 'password'}
+                value={val}
+                placeholder="Enter passphrase..."
+                onChange={e => { setVal(e.target.value); setWrong(false) }}
+                onKeyDown={e => e.key === 'Enter' && tryUnlock()}
+                style={{
+                  ...s.input,
+                  borderColor: wrong ? '#e88080' : 'rgba(200,120,140,0.3)',
+                  paddingRight: 44,
+                }}
+                autoCapitalize="none"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass(v => !v)}
+                style={s.eyeBtn}
+                aria-label={showPass ? 'Hide passphrase' : 'Show passphrase'}
+              >
+                {showPass ? '🙈' : '👁️'}
+              </button>
+            </div>
+
+            {wrong && (
+              <div style={s.wrongMsg}>
+                {attempts >= 3
+                  ? '💡 Hint: Think of our special word 💕'
+                  : "That's not right, try again 🌸"}
+              </div>
+            )}
+          </>
+        )}
+
+        <button
+          style={{ ...s.btn, opacity: checking ? 0.7 : 1 }}
+          onClick={tryUnlock}
+          disabled={checking}
+        >
+          {checking ? 'Checking…' : 'Enter with love 💕'}
         </button>
 
         <div style={s.divider}>
@@ -77,7 +133,7 @@ export default function LockScreen({ onUnlock }) {
           View as Visitor 👀
         </button>
 
-        <p style={s.footer}>Only the two of us know this date 🌹</p>
+        <p style={s.footer}>Only the two of you know the secret 🌹</p>
       </div>
 
       <style>{`
@@ -91,11 +147,6 @@ export default function LockScreen({ onUnlock }) {
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(24px); }
           to   { opacity: 1; transform: translateY(0); }
-        }
-        input[type="date"]::-webkit-calendar-picker-indicator {
-          filter: invert(40%) sepia(20%) saturate(400%) hue-rotate(300deg);
-          cursor: pointer;
-          padding: 4px;
         }
       `}</style>
     </div>
@@ -134,6 +185,24 @@ const s = {
     fontSize: '0.9rem', color: '#9b6b7b',
     lineHeight: 1.6, marginBottom: 22,
   },
+  setupBanner: {
+    background: '#fff8e1',
+    border: '1px solid #ffe082',
+    borderRadius: 14,
+    padding: '14px 16px',
+    fontSize: '0.82rem',
+    color: '#7a6000',
+    marginBottom: 18,
+    lineHeight: 1.6,
+    textAlign: 'left',
+  },
+  code: {
+    fontFamily: 'monospace',
+    background: '#f3e5ab',
+    padding: '1px 6px',
+    borderRadius: 6,
+    fontSize: '0.78rem',
+  },
   question: {
     fontFamily: "'Playfair Display', serif",
     fontStyle: 'italic', fontSize: '1rem', color: '#6d3f52',
@@ -144,14 +213,21 @@ const s = {
     width: '100%', padding: '14px 16px',
     border: '2px solid rgba(200,120,140,0.3)',
     borderRadius: 14,
-    fontFamily: "Lato, sans-serif",
+    fontFamily: 'Lato, sans-serif',
     fontSize: '1rem', color: '#4a3040',
     background: '#fdf0f2', outline: 'none',
     textAlign: 'center', marginBottom: 10,
     display: 'block', boxSizing: 'border-box',
     transition: 'border-color 0.2s',
-    WebkitAppearance: 'none',
-    appearance: 'none',
+    WebkitAppearance: 'none', appearance: 'none',
+  },
+  eyeBtn: {
+    position: 'absolute', right: 12, top: '50%',
+    transform: 'translateY(-66%)',
+    background: 'none', border: 'none',
+    cursor: 'pointer', fontSize: '1.1rem',
+    padding: 4, lineHeight: 1,
+    WebkitTapHighlightColor: 'transparent',
   },
   wrongMsg: {
     fontSize: '0.82rem', color: '#c05050',
@@ -162,7 +238,7 @@ const s = {
     width: '100%', padding: '14px',
     background: 'linear-gradient(135deg, #9b6b7b, #6d3f52)',
     color: 'white', border: 'none', borderRadius: 50,
-    fontFamily: "Lato, sans-serif",
+    fontFamily: 'Lato, sans-serif',
     fontSize: '0.95rem', cursor: 'pointer',
     marginTop: 4, letterSpacing: '0.3px',
     transition: 'all 0.2s',

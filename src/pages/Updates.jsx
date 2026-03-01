@@ -239,9 +239,13 @@ export default function Updates() {
               {viewPhoto.who === 'Kishan' ? '💙' : '🌸'} {viewPhoto.who} · {viewPhoto.date}
             </div>
             <Button variant="danger" size="sm" onClick={async () => {
-              await fsDelete('photos', viewPhoto.id)
-              setViewPhoto(null)
-              showToast('Deleted')
+              try {
+                await fsDelete('photos', viewPhoto.id)
+                setViewPhoto(null)
+                showToast('Deleted')
+              } catch {
+                showToast('Error deleting')
+              }
             }}>
               Delete Photo
             </Button>

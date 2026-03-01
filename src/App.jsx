@@ -29,7 +29,6 @@ const NAV = [
 // when new content is added by the partner
 function NotificationBell() {
   const [status, setStatus] = useState('default')
-  const [hasNew, setHasNew] = useState(false)
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -48,16 +47,12 @@ function NotificationBell() {
       const perm = await Notification.requestPermission()
       setStatus(perm)
       if (perm === 'granted') {
-        // Register for push if SW is available
-        const reg = await navigator.serviceWorker?.ready
-        if (reg) {
-          new Notification('Kishan & Aditi 💕', {
-            body: "Notifications enabled! You'll get love reminders 🌸",
-            icon: '/heart.svg',
-            tag: 'welcome',
-          })
-        }
-        setHasNew(false)
+        // Show a welcome notification to confirm it works
+        new Notification('Kishan & Aditi 💕', {
+          body: "Notifications enabled! You'll get love reminders 🌸",
+          icon: '/heart.svg',
+          tag: 'welcome',
+        })
       }
     } catch (err) {
       console.warn('Notification request failed:', err)
@@ -78,7 +73,7 @@ function NotificationBell() {
         padding: '6px 12px',
         fontSize: '1rem',
         cursor: status === 'granted' ? 'default' : 'pointer',
-        fontFamily: "'Lato', sans-serif",
+        fontFamily: "Lato, sans-serif",
         position: 'relative',
         transition: 'all 0.2s',
         WebkitTapHighlightColor: 'transparent',
@@ -96,7 +91,7 @@ function NotificationBell() {
           Blocked
         </span>
       )}
-      {hasNew && <span className="notification-dot" />}
+
     </button>
   )
 }
@@ -304,7 +299,7 @@ const styles = {
     padding: '6px 14px',
     fontSize: '0.82rem',
     cursor: 'pointer',
-    fontFamily: "'Lato', sans-serif",
+    fontFamily: "Lato, sans-serif",
     transition: 'all 0.2s',
     WebkitTapHighlightColor: 'transparent',
   },
@@ -352,7 +347,7 @@ const styles = {
     borderRadius: 18,
     background: 'var(--petal)',
     cursor: 'pointer',
-    fontFamily: "'Lato', sans-serif",
+    fontFamily: "Lato, sans-serif",
     lineHeight: 1.4,
     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
     textAlign: 'center',

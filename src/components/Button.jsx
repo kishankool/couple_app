@@ -4,7 +4,7 @@ export default function Button({ children, onClick, variant = 'primary', size = 
   const base = {
     border: 'none',
     borderRadius: 50,
-    fontFamily: "'Lato', sans-serif",
+    fontFamily: "Lato, sans-serif",
     cursor: disabled ? 'not-allowed' : 'pointer',
     display: 'inline-flex',
     alignItems: 'center',

@@ -26,14 +26,19 @@ export const fsUpdate = (col, id, data) => updateDoc(doc(db, col, id), data)
 // Previously had limit(100) which could block additions if Firestore index wasn't created
 export const fsListen = (col, cb, order = 'createdAt') => {
   const q = query(collection(db, col), orderBy(order, 'desc'))
-  return onSnapshot(q, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+  let fallbackUnsub = null
+  const primaryUnsub = onSnapshot(q, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
     (error) => {
       console.warn(`Firestore listener error on "${col}":`, error.message)
       // If the index isn't ready yet, fall back to unordered query
       const fallbackQ = query(collection(db, col))
-      return onSnapshot(fallbackQ, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+      fallbackUnsub = onSnapshot(fallbackQ, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
     }
   )
+  return () => {
+    primaryUnsub()
+    if (fallbackUnsub) fallbackUnsub()
+  }
 }
 
 // Cloudinary upload — free tier, no payment needed
@@ -63,7 +68,7 @@ export const sendPartnerNotification = (who, action) => {
   if (!('Notification' in window)) return
   if (Notification.permission !== 'granted') return
   
-  const partnerName = who === 'Kishan' ? 'Kishan' : 'Aditi'
+  const partnerName = who === 'Kishan' ? 'Aditi' : 'Kishan'
   
   const messages = {
     note: `${partnerName} sent you a love note 💌`,

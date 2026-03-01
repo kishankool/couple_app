@@ -133,7 +133,8 @@ export default function LockScreen({ onUnlock }) {
           View as Visitor 👀
         </button>
 
-        <p style={s.footer}>Only the two of you know the secret 🌹</p>
+        <p style={s.footer}>Only the two of us know the secret 🌹</p>
+        <p style={s.credit}>Made with 💕 by Kishan</p>
       </div>
 
       <style>{`
@@ -245,6 +246,15 @@ const s = {
     WebkitTapHighlightColor: 'transparent',
   },
   footer: { fontSize: '0.72rem', color: '#b89090', marginTop: 16 },
+  credit: {
+    fontSize: '0.62rem',
+    color: 'rgba(155,107,123,0.45)',
+    fontFamily: "'Playfair Display', serif",
+    fontStyle: 'italic',
+    letterSpacing: '0.4px',
+    marginTop: 6,
+    userSelect: 'none',
+  },
   divider: {
     display: 'flex', alignItems: 'center', gap: 12,
     margin: '14px 0 10px',

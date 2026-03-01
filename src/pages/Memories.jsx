@@ -1,16 +1,271 @@
-import React, { useState, useEffect, useContext, useRef } from 'react'
+import React, { useState, useEffect, useContext, useRef, useCallback, useMemo } from 'react'
 import Modal from '../components/Modal'
 import Button from '../components/Button'
 import ImageUpload from '../components/ImageUpload'
 import { fsAdd, fsDelete, fsListen, uploadImageCloudinary } from '../firebase'
 import { ToastContext } from '../App'
 
+/* ─── Constants ─── */
+const JOURNEY_KEY = 'ka_memory_journey_seen'
+const EMOJIS_BY_MONTH = {
+  '01': '❄️', '02': '💕', '03': '🌸', '04': '🌷',
+  '05': '☀️', '06': '🌻', '07': '🌊', '08': '⭐',
+  '09': '🍂', '10': '🎃', '11': '🍁', '12': '🎄',
+}
+const PATH_COLORS = [
+  '#e8a0a0', '#b5c9b5', '#c9b5c9', '#b5bec9', '#c9c3b5', '#b5c9c0',
+]
+
+/* ─── Helpers ─── */
+function formatDate(d) {
+  try {
+    return new Date(d + 'T12:00:00').toLocaleDateString('en-IN', {
+      day: 'numeric', month: 'short', year: 'numeric',
+    })
+  } catch { return d }
+}
+
+function formatMonthYear(d) {
+  try {
+    return new Date(d + 'T12:00:00').toLocaleDateString('en-IN', {
+      month: 'long', year: 'numeric',
+    })
+  } catch { return d }
+}
+
+function getMonthEmoji(dateStr) {
+  if (!dateStr) return '📸'
+  const month = dateStr.substring(5, 7)
+  return EMOJIS_BY_MONTH[month] || '📸'
+}
+
+function getDaysBetween(d1, d2) {
+  try {
+    const a = new Date(d1 + 'T12:00:00')
+    const b = new Date(d2 + 'T12:00:00')
+    return Math.round(Math.abs(b - a) / (1000 * 60 * 60 * 24))
+  } catch { return 0 }
+}
+
+/* ═══════════════════════════════════════════
+   CURVED PATH SVG — snaking bezier between dots
+   ═══════════════════════════════════════════ */
+function CurvedPathSVG({ pathRef, dotRefs, count }) {
+  const [pathD, setPathD] = useState('')
+  const [size, setSize] = useState({ w: 0, h: 0 })
+
+  useEffect(() => {
+    const measure = () => {
+      if (!pathRef.current || count < 2) return
+      const cr = pathRef.current.getBoundingClientRect()
+      const centerX = cr.width / 2
+      const swing = Math.min(cr.width * 0.22, 70)
+
+      const pts = dotRefs.current
+        .slice(0, count)
+        .map(el => {
+          if (!el) return null
+          const r = el.getBoundingClientRect()
+          return {
+            x: r.left + r.width / 2 - cr.left,
+            y: r.top + r.height / 2 - cr.top,
+          }
+        })
+        .filter(Boolean)
+
+      if (pts.length < 2) return
+
+      let d = `M ${pts[0].x} ${pts[0].y}`
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p1 = pts[i]
+        const p2 = pts[i + 1]
+        const dir = i % 2 === 0 ? 1 : -1
+        const cpX = centerX + swing * dir
+        const dy = p2.y - p1.y
+        d += ` C ${cpX} ${p1.y + dy * 0.38}, ${cpX} ${p2.y - dy * 0.38}, ${p2.x} ${p2.y}`
+      }
+
+      setPathD(d)
+      setSize({ w: cr.width, h: cr.height })
+    }
+
+    measure()
+    // Re-measure on resize and after layout changes
+    const ro = new ResizeObserver(measure)
+    if (pathRef.current) ro.observe(pathRef.current)
+    // Also re-measure after a short delay for animations
+    const timer = setTimeout(measure, 600)
+    return () => { ro.disconnect(); clearTimeout(timer) }
+  }, [pathRef, dotRefs, count])
+
+  if (!pathD || size.h < 10) return null
+
+  return (
+    <svg
+      className="tl-curved-svg"
+      width={size.w}
+      height={size.h}
+      viewBox={`0 0 ${size.w} ${size.h}`}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        pointerEvents: 'none',
+        zIndex: 0,
+        overflow: 'visible',
+      }}
+    >
+      <defs>
+        <linearGradient id="curvedPathGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#e8a0a0" stopOpacity="0.7" />
+          <stop offset="25%" stopColor="#9b6b7b" stopOpacity="0.55" />
+          <stop offset="50%" stopColor="#b5c9b5" stopOpacity="0.55" />
+          <stop offset="75%" stopColor="#d4a96a" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#c97a7a" stopOpacity="0.7" />
+        </linearGradient>
+        <filter id="pathGlow">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      {/* Glow layer */}
+      <path d={pathD} fill="none" stroke="rgba(232,160,160,0.15)" strokeWidth="10" strokeLinecap="round" />
+      {/* Main path */}
+      <path d={pathD} fill="none" stroke="url(#curvedPathGrad)" strokeWidth="3" strokeLinecap="round" />
+      {/* Animated dashes overlay */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke="rgba(255,255,255,0.3)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray="6 14"
+        className="tl-path-flow"
+      />
+    </svg>
+  )
+}
+
+/* ═══════════════════════════════════════════
+   TIMELINE NODE — an interactive waypoint
+   ═══════════════════════════════════════════ */
+function TimelineNode({ memory: m, index, total, isActive, onActivate, onDelete, isLeft, dotRef }) {
+  const nodeRef = useRef(null)
+
+  useEffect(() => {
+    if (isActive && nodeRef.current) {
+      nodeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [isActive])
+
+  const del = (e) => {
+    e.stopPropagation()
+    onDelete(m)
+  }
+
+  return (
+    <div
+      ref={nodeRef}
+      className={`tl-node ${isActive ? 'tl-node-active' : ''} ${isLeft ? 'tl-left' : 'tl-right'}`}
+      style={{ animationDelay: `${Math.min(index * 0.1, 1)}s` }}
+    >
+      {/* Date waypoint on the line */}
+      <div className="tl-waypoint" onClick={() => onActivate(m.id)}>
+        <div ref={dotRef} className={`tl-dot ${isActive ? 'tl-dot-active' : ''}`}>
+          <span className="tl-dot-emoji">{getMonthEmoji(m.date)}</span>
+        </div>
+        <div className="tl-date-label">{m.date ? formatDate(m.date) : ''}</div>
+      </div>
+
+      {/* Connector arm */}
+      <div className={`tl-arm ${isLeft ? 'tl-arm-left' : 'tl-arm-right'}`} />
+
+      {/* Memory card */}
+      <div
+        className={`tl-card ${isActive ? 'tl-card-open' : 'tl-card-closed'}`}
+        onClick={() => onActivate(m.id)}
+      >
+        {/* Compact preview (when closed) */}
+        {!isActive && (
+          <div className="tl-card-preview">
+            {m.imgUrl && (
+              <img src={m.imgUrl} alt={m.title} className="tl-card-thumb" loading="lazy" />
+            )}
+            <div className="tl-card-preview-text">
+              <div className="tl-card-mini-title">{m.title}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Expanded (when active) */}
+        {isActive && (
+          <div className="tl-card-expanded">
+            {m.imgUrl ? (
+              <img src={m.imgUrl} alt={m.title} className="tl-card-img" />
+            ) : (
+              <div className="tl-card-placeholder">📸</div>
+            )}
+            <div className="tl-card-body">
+              <div className="tl-card-title">{m.title}</div>
+              {m.caption && <div className="tl-card-caption">"{m.caption}"</div>}
+              <div className="tl-card-date">{m.date ? formatDate(m.date) : ''}</div>
+            </div>
+            <button type="button" className="tl-card-del" onClick={del} aria-label={`Delete: ${m.title}`}>
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════
+   JOURNEY CONTROLS — auto-play overlay
+   ═══════════════════════════════════════════ */
+function JourneyControls({ current, total, isPlaying, onPlay, onPause, onPrev, onNext, onExit }) {
+  return (
+    <div className="journey-controls">
+      <div className="journey-progress-bar">
+        <div
+          className="journey-progress-fill"
+          style={{ width: `${((current + 1) / total) * 100}%` }}
+        />
+      </div>
+      <div className="journey-controls-row">
+        <button className="journey-btn" onClick={onExit}>✕</button>
+        <button className="journey-btn" onClick={onPrev} disabled={current <= 0}>←</button>
+        <button className="journey-btn journey-btn-play" onClick={isPlaying ? onPause : onPlay}>
+          {isPlaying ? '⏸' : '▶'}
+        </button>
+        <button className="journey-btn" onClick={onNext} disabled={current >= total - 1}>→</button>
+        <span className="journey-counter">{current + 1} / {total}</span>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════
+   MAIN COMPONENT
+   ═══════════════════════════════════════════ */
 export default function Memories() {
   const showToast = useContext(ToastContext)
   const [memories, setMemories] = useState([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
-  const [selected, setSelected] = useState(null)
+  const [selected, setSelected] = useState(null) // for view modal
+  const [activeId, setActiveId] = useState(null)
+
+  // Journey auto-play state
+  const [isJourney, setIsJourney] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [journeyIndex, setJourneyIndex] = useState(0)
+  const playTimer = useRef(null)
+  const pathRef = useRef(null)
+  const dotRefs = useRef([])
 
   // Form state
   const [title, setTitle] = useState('')
@@ -20,11 +275,70 @@ export default function Memories() {
   const [preview, setPreview] = useState(null)
   const [saving, setSaving] = useState(false)
 
+  // Sort memories chronologically (oldest first for the timeline)
+  const sorted = useMemo(() =>
+    [...memories].sort((a, b) => (a.date || '').localeCompare(b.date || '')),
+    [memories]
+  )
+
   useEffect(() => {
-    // Listen with no limit restriction — shows ALL memories
-    const unsub = fsListen('memories', data => { setMemories(data); setLoading(false) })
+    const unsub = fsListen('memories', data => {
+      setMemories(data)
+      setLoading(false)
+    })
     return unsub
   }, [])
+
+  // First visit → start journey automatically
+  useEffect(() => {
+    if (!loading && sorted.length > 0 && !localStorage.getItem(JOURNEY_KEY)) {
+      startJourney()
+    }
+  }, [loading, sorted.length])
+
+  // Auto-play timer
+  useEffect(() => {
+    if (isPlaying && isJourney && sorted.length > 0) {
+      playTimer.current = setTimeout(() => {
+        if (journeyIndex < sorted.length - 1) {
+          setJourneyIndex(i => i + 1)
+        } else {
+          setIsPlaying(false)
+          localStorage.setItem(JOURNEY_KEY, '1')
+        }
+      }, 3500)
+      return () => clearTimeout(playTimer.current)
+    }
+  }, [isPlaying, journeyIndex, isJourney, sorted.length])
+
+  // Sync journey index with active node
+  useEffect(() => {
+    if (isJourney && sorted[journeyIndex]) {
+      setActiveId(sorted[journeyIndex].id)
+    }
+  }, [journeyIndex, isJourney, sorted])
+
+  const startJourney = useCallback(() => {
+    setIsJourney(true)
+    setJourneyIndex(0)
+    setIsPlaying(true)
+    if (sorted.length > 0) setActiveId(sorted[0].id)
+  }, [sorted])
+
+  const stopJourney = useCallback(() => {
+    setIsJourney(false)
+    setIsPlaying(false)
+    localStorage.setItem(JOURNEY_KEY, '1')
+  }, [])
+
+  const handleActivate = useCallback((id) => {
+    // If journey is playing, pause it when user taps a node
+    if (isPlaying) setIsPlaying(false)
+    setActiveId(prev => prev === id ? null : id)
+    // Update journey index to match
+    const idx = sorted.findIndex(m => m.id === id)
+    if (idx >= 0) setJourneyIndex(idx)
+  }, [isPlaying, sorted])
 
   const handleFile = (f) => {
     if (preview) URL.revokeObjectURL(preview)
@@ -48,47 +362,133 @@ export default function Memories() {
         caption: caption.trim(),
         date: date || new Date().toLocaleDateString('en-CA'),
         imgUrl,
-        rotate: (Math.random() * 6 - 3).toFixed(2),
       })
       resetForm()
       setOpen(false)
       showToast('Memory saved! 📸')
     } catch (e) {
       console.error(e)
-      showToast('Error saving memory — check Cloudinary config')
+      showToast('Error saving memory')
     }
     setSaving(false)
   }
 
-  const del = async (m, e) => {
-    if (e) e.stopPropagation()
-    try { await fsDelete('memories', m.id); showToast('Memory deleted') }
-    catch { showToast('Error deleting') }
+  const del = async (m) => {
+    try {
+      await fsDelete('memories', m.id)
+      if (activeId === m.id) setActiveId(null)
+      showToast('Memory deleted')
+    } catch {
+      showToast('Error deleting')
+    }
   }
+
+  // ─── Compute timeline stats ───
+  const stats = useMemo(() => {
+    if (sorted.length < 2) return null
+    const days = getDaysBetween(sorted[0].date, sorted[sorted.length - 1].date)
+    return { days, start: sorted[0].date, end: sorted[sorted.length - 1].date }
+  }, [sorted])
 
   return (
     <div className="page-content">
-      <div style={styles.header}>
+      {/* Header */}
+      <div className="tl-header">
         <div>
-          <div style={styles.pageTitle}>📸 Memories</div>
-          <div style={styles.pageSub}>Our polaroid wall · {memories.length} {memories.length === 1 ? 'memory' : 'memories'}</div>
+          <div className="tl-page-title">📍 Memory Timeline</div>
+          <div className="tl-page-sub">
+            {sorted.length} {sorted.length === 1 ? 'memory' : 'memories'}
+            {stats && ` · ${stats.days} days of love`}
+          </div>
         </div>
-        <Button size="sm" onClick={() => { resetForm(); setOpen(true) }}>+ Add</Button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {sorted.length > 1 && (
+            <Button size="sm" variant="ghost" onClick={startJourney}>
+              ▶ Journey
+            </Button>
+          )}
+          <Button size="sm" onClick={() => { resetForm(); setOpen(true) }}>+ Add</Button>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="loading">🌸</div>
-      ) : memories.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">📸</div>
-          <p>No memories yet.<br />Add your first polaroid!</p>
-        </div>
-      ) : (
-        <div style={styles.wall}>
-          {memories.map((m, i) => (
-            <PolaroidCard key={m.id} memory={m} index={i} onClick={() => setSelected(m)} onDelete={(e) => del(m, e)} />
-          ))}
-        </div>
+      {/* Timeline Map */}
+      <div className="tl-map">
+        {loading ? (
+          <div className="loading">🌸</div>
+        ) : sorted.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">📍</div>
+            <p>No memories yet.<br />Start your journey!</p>
+          </div>
+        ) : (
+          <>
+            {/* Timeline start marker */}
+            <div className="tl-start-marker">
+              <div className="tl-start-flag">🏁</div>
+              <div className="tl-start-label">Our story begins…</div>
+              {sorted[0]?.date && (
+                <div className="tl-start-date">{formatDate(sorted[0].date)}</div>
+              )}
+            </div>
+
+            {/* The vertical path */}
+            <div className="tl-path" ref={pathRef}>
+              <CurvedPathSVG pathRef={pathRef} dotRefs={dotRefs} count={sorted.length} />
+              {sorted.map((m, i) => {
+                const isLeft = i % 2 === 0
+                // Day gap indicator between memories
+                const gap = i > 0 ? getDaysBetween(sorted[i - 1].date, m.date) : 0
+                return (
+                  <React.Fragment key={m.id}>
+                    {/* Day gap badge */}
+                    {gap > 0 && (
+                      <div className="tl-gap-badge">
+                        <span className="tl-gap-line" />
+                        <span className="tl-gap-text">
+                          {gap === 1 ? 'next day' : `${gap} days later`}
+                        </span>
+                        <span className="tl-gap-line" />
+                      </div>
+                    )}
+
+                    <TimelineNode
+                      memory={m}
+                      index={i}
+                      total={sorted.length}
+                      isActive={activeId === m.id}
+                      onActivate={handleActivate}
+                      onDelete={del}
+                      isLeft={isLeft}
+                      dotRef={el => { dotRefs.current[i] = el }}
+                    />
+                  </React.Fragment>
+                )
+              })}
+            </div>
+
+            {/* Timeline end marker */}
+            <div className="tl-end-marker">
+              <div className="tl-end-heart">💕</div>
+              <div className="tl-end-label">
+                {stats ? `${stats.days} days & counting…` : 'To be continued…'}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Journey auto-play controls */}
+      {isJourney && sorted.length > 0 && (
+        <JourneyControls
+          current={journeyIndex}
+          total={sorted.length}
+          isPlaying={isPlaying}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onPrev={() => { setIsPlaying(false); setJourneyIndex(i => Math.max(0, i - 1)) }}
+          onNext={() => { setIsPlaying(false); setJourneyIndex(i => Math.min(sorted.length - 1, i + 1)) }}
+          onExit={stopJourney}
+        />
       )}
 
       {/* Add Memory Modal */}
@@ -98,203 +498,9 @@ export default function Memories() {
         <input value={caption} onChange={e => setCaption(e.target.value)} placeholder="Caption / note (optional)" style={{ marginBottom: 10 }} />
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ marginBottom: 16 }} />
         <Button size="full" onClick={save} disabled={saving}>
-          {saving ? 'Developing your polaroid… 📸' : 'Save Memory 🌸'}
+          {saving ? 'Saving memory… 📸' : 'Save Memory 🌸'}
         </Button>
       </Modal>
-
-      {/* View Modal */}
-      <Modal open={!!selected} onClose={() => setSelected(null)} title="">
-        {selected && (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ ...styles.polaroidLarge }}>
-              {selected.imgUrl
-                ? <img src={selected.imgUrl} alt={selected.title} style={styles.polaroidImgLarge} />
-                : <div style={styles.polaroidPlaceholderLarge}>📸</div>
-              }
-              <div style={styles.polaroidBottomLarge}>
-                <div style={styles.polaroidTitleLarge}>{selected.title}</div>
-                {selected.caption && <div style={styles.polaroidCaptionLarge}>{selected.caption}</div>}
-                <div style={styles.polaroidDateLarge}>{selected.date ? formatDate(selected.date) : ''}</div>
-              </div>
-            </div>
-            <Button variant="danger" size="sm" style={{ marginTop: 16 }}
-              onClick={async () => {
-                try {
-                  await fsDelete('memories', selected.id)
-                  setSelected(null)
-                  showToast('Deleted')
-                } catch {
-                  showToast('Error deleting')
-                }
-              }}>
-              Delete Memory
-            </Button>
-          </div>
-        )}
-      </Modal>
     </div>
   )
-}
-
-function PolaroidCard({ memory: m, index, onClick, onDelete }) {
-  const rotate = parseFloat(m.rotate || 0)
-  const bgTints = ['#fffdf5', '#fdf5ff', '#f5fff8', '#fff5f5', '#f5f8ff']
-  const tint = bgTints[index % bgTints.length]
-
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        ...styles.polaroid,
-        transform: `rotate(${rotate}deg)`,
-        background: tint,
-        animationDelay: `${Math.min(index * 0.06, 0.6)}s`,
-      }}
-    >
-      {m.imgUrl
-        ? <img src={m.imgUrl} alt={m.title} style={styles.polaroidImg} loading="lazy" />
-        : <div style={styles.polaroidPlaceholder}>📸</div>
-      }
-      <div style={styles.polaroidBottom}>
-        <div style={styles.polaroidTitle}>{m.title}</div>
-        {m.caption && <div style={styles.polaroidCaption}>{m.caption}</div>}
-        <div style={styles.polaroidDate}>{m.date ? formatDate(m.date) : ''}</div>
-      </div>
-      <button
-        style={styles.delBtn}
-        onClick={onDelete}
-        title="Delete"
-      >✕</button>
-    </div>
-  )
-}
-
-function formatDate(d) {
-  try {
-    return new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-  } catch { return d }
-}
-
-const styles = {
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  pageTitle: { fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', color: 'var(--mauve-deep)' },
-  pageSub: { fontSize: '0.75rem', color: 'var(--text-light)', marginTop: 2 },
-
-  // Polaroid wall — responsive masonry
-  wall: {
-    columns: 2,
-    columnGap: 12,
-    columnFill: 'balance',
-  },
-
-  polaroid: {
-    breakInside: 'avoid',
-    display: 'inline-block',
-    width: '100%',
-    background: '#fffdf5',
-    padding: '7px 7px 14px',
-    boxShadow: '0 4px 16px rgba(100,60,80,0.15), 0 1px 4px rgba(0,0,0,0.06)',
-    borderRadius: 3,
-    marginBottom: 12,
-    cursor: 'pointer',
-    position: 'relative',
-    transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s',
-    animation: 'fadeUp 0.4s ease both',
-    WebkitTapHighlightColor: 'transparent',
-  },
-
-  polaroidImg: {
-    width: '100%',
-    aspectRatio: '1',
-    objectFit: 'cover',
-    display: 'block',
-    borderRadius: 2,
-    filter: 'contrast(1.04) saturate(0.95)',
-  },
-
-  polaroidPlaceholder: {
-    width: '100%', aspectRatio: '1',
-    background: 'linear-gradient(135deg, #f5e8ee, #ede0e8)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '2.2rem', borderRadius: 2,
-  },
-
-  polaroidBottom: {
-    paddingTop: 7,
-    paddingBottom: 2,
-    textAlign: 'center',
-    minHeight: 40,
-  },
-
-  polaroidTitle: {
-    fontFamily: "'Caveat', cursive",
-    fontSize: '0.95rem',
-    fontWeight: 600,
-    color: '#4a3040',
-    lineHeight: 1.3,
-  },
-
-  polaroidCaption: {
-    fontFamily: "'Reenie Beanie', cursive",
-    fontSize: '0.9rem',
-    color: '#9b6b7b',
-    marginTop: 2,
-    lineHeight: 1.3,
-  },
-
-  polaroidDate: {
-    fontFamily: "'Caveat', cursive",
-    fontSize: '0.72rem',
-    color: '#b89090',
-    marginTop: 3,
-  },
-
-  delBtn: {
-    position: 'absolute', top: 4, right: 4,
-    background: 'rgba(0,0,0,0.35)', color: 'white',
-    border: 'none', borderRadius: '50%',
-    width: 24, height: 24, fontSize: '0.6rem',
-    cursor: 'pointer', display: 'flex',
-    alignItems: 'center', justifyContent: 'center',
-    opacity: 0.6,
-    transition: 'opacity 0.2s',
-    WebkitTapHighlightColor: 'transparent',
-  },
-
-  // Large polaroid in modal
-  polaroidLarge: {
-    background: '#fffdf5',
-    padding: '12px 12px 24px',
-    boxShadow: '0 8px 30px rgba(100,60,80,0.2)',
-    borderRadius: 3,
-    display: 'inline-block',
-    maxWidth: '100%',
-    width: '100%',
-  },
-  polaroidImgLarge: {
-    width: '100%',
-    maxHeight: 320,
-    objectFit: 'cover',
-    borderRadius: 2,
-    filter: 'contrast(1.04) saturate(0.95)',
-  },
-  polaroidPlaceholderLarge: {
-    width: '100%', height: 220,
-    background: '#f5e8ee',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '4rem',
-  },
-  polaroidBottomLarge: { paddingTop: 14, textAlign: 'center' },
-  polaroidTitleLarge: {
-    fontFamily: "'Caveat', cursive",
-    fontSize: '1.4rem', fontWeight: 600, color: '#4a3040',
-  },
-  polaroidCaptionLarge: {
-    fontFamily: "'Reenie Beanie', cursive",
-    fontSize: '1.2rem', color: '#9b6b7b', marginTop: 4,
-  },
-  polaroidDateLarge: {
-    fontFamily: "'Caveat', cursive",
-    fontSize: '0.95rem', color: '#b89090', marginTop: 5,
-  },
 }

@@ -25,35 +25,23 @@ const NAV_ALL = [
   { path: '/more', icon: '🌹', label: 'More' },
 ]
 
-// ── Notification Manager ──
-// Handles both permission requests AND in-app notifications
-// when new content is added by the partner
-function NotificationBell() {
-  const [status, setStatus] = useState('default')
+import { subscribeToPush } from './push'
 
-  useEffect(() => {
-    if ('Notification' in window) {
-      setStatus(Notification.permission)
-    }
-  }, [])
+// ── Notification Manager ──
+function NotificationBell({ who, showToast }) {
+  const [status, setStatus] = useState(() => {
+    if (!('Notification' in window)) return 'unsupported'
+    return Notification.permission
+  })
 
   const request = async () => {
-    if (!('Notification' in window)) {
-      // Fallback for browsers that don't support Notification API (some iOS WebViews)
-      setStatus('denied')
-      return
-    }
-
+    if (!('Notification' in window)) return
     try {
       const perm = await Notification.requestPermission()
       setStatus(perm)
       if (perm === 'granted') {
-        // Show a welcome notification to confirm it works
-        new Notification('Kishan & Aditi 💕', {
-          body: "Notifications enabled! You'll get love reminders 🌸",
-          icon: '/heart.svg',
-          tag: 'welcome',
-        })
+        await subscribeToPush(who)
+        showToast?.('Notifications enabled! 🌸')
       }
     } catch (err) {
       console.warn('Notification request failed:', err)
@@ -61,11 +49,17 @@ function NotificationBell() {
     }
   }
 
+  if (status === 'unsupported') return null
+
   return (
     <button
       id="notification-bell"
       onClick={status !== 'granted' ? request : undefined}
-      title={status === 'granted' ? 'Notifications on' : status === 'denied' ? 'Notifications blocked — enable in settings' : 'Enable notifications'}
+      title={
+        status === 'granted' ? 'Notifications on'
+          : status === 'denied' ? 'Notifications blocked — enable in Settings'
+            : 'Enable notifications'
+      }
       style={{
         background: 'rgba(255,255,255,0.15)',
         border: '1px solid rgba(255,255,255,0.3)',
@@ -74,25 +68,12 @@ function NotificationBell() {
         padding: '6px 12px',
         fontSize: '1rem',
         cursor: status === 'granted' ? 'default' : 'pointer',
-        fontFamily: "Lato, sans-serif",
-        position: 'relative',
+        fontFamily: 'Lato, sans-serif',
         transition: 'all 0.2s',
         WebkitTapHighlightColor: 'transparent',
       }}
     >
       {status === 'granted' ? '🔔' : status === 'denied' ? '🚫' : '🔕'}
-      {status === 'denied' && (
-        <span style={{
-          display: 'block',
-          fontSize: '0.55rem',
-          opacity: 0.8,
-          marginTop: 1,
-          lineHeight: 1,
-        }}>
-          Blocked
-        </span>
-      )}
-
     </button>
   )
 }
@@ -123,20 +104,23 @@ export default function App() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [toast, setToast] = useState(null)
+  const [toastMsg, setToastMsg] = useState(null)
   const [who, setWhoState] = useState(() => localStorage.getItem('ka_who') || 'Kishan')
   const [showWhoModal, setShowWhoModal] = useState(false)
   const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem('ka_unlocked') === '1')
   const [isVisitor, setIsVisitor] = useState(() => sessionStorage.getItem('ka_role') === 'visitor')
   const toastTimerRef = useRef(null)
+  // Ref so NotificationBell can call showToast without re-renders
+  const showToastRef = useRef(null)
 
   const NAV = isVisitor ? NAV_ALL.filter(n => !n.private) : NAV_ALL
 
   const showToast = useCallback((msg) => {
-    setToast(msg)
+    setToastMsg(msg)
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
-    toastTimerRef.current = setTimeout(() => setToast(null), 2800)
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 2800)
   }, [])
+  showToastRef.current = showToast
 
   const selectWho = (name) => {
     setWhoState(name)
@@ -157,6 +141,18 @@ export default function App() {
       document.body.style.overscrollBehavior = 'none'
     }
   }, [])
+
+  // Register SW + auto-subscribe to push when owner logs in
+  useEffect(() => {
+    if (!unlocked || isVisitor) return
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(async () => {
+        if (Notification.permission === 'granted') {
+          await subscribeToPush(who)
+        }
+      }).catch(console.warn)
+    }
+  }, [unlocked, isVisitor, who])
 
   // Show lock screen if not yet unlocked
   if (!unlocked) {
@@ -183,25 +179,15 @@ export default function App() {
             {/* ── Top Bar ── */}
             <header style={styles.topbar}>
               <div style={styles.topbarTitle}>Kishan & Aditi 💕</div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {isVisitor ? (
-                  <button style={styles.visitorTag} onClick={() => {
-                    sessionStorage.removeItem('ka_unlocked')
-                    sessionStorage.removeItem('ka_role')
-                    setUnlocked(false)
-                    setIsVisitor(false)
-                  }}>
-                    👁️ Visitor · 🔒
+              {/* Only show top-bar controls for owners */}
+              {!isVisitor && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <NotificationBell who={who} showToast={showToast} />
+                  <button style={styles.whoTag} onClick={() => setShowWhoModal(true)}>
+                    {who === 'Kishan' ? '💙' : '🌸'} {who}
                   </button>
-                ) : (
-                  <>
-                    <NotificationBell />
-                    <button style={styles.whoTag} onClick={() => setShowWhoModal(true)}>
-                      {who === 'Kishan' ? '💙' : '🌸'} {who}
-                    </button>
-                  </>
-                )}
-              </div>
+                </div>
+              )}
             </header>
 
             {/* ── Pages ── */}
@@ -271,7 +257,7 @@ export default function App() {
               </div>
             </nav>
 
-            {toast && <Toast msg={toast} />}
+            {toastMsg && <Toast msg={toastMsg} />}
 
             {/* ── Who are you modal ── */}
             <Modal open={showWhoModal} onClose={() => who && setShowWhoModal(false)} title="Who's using the app? 💕">

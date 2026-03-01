@@ -4,6 +4,7 @@ import Card, { CardTitle } from '../components/Card'
 import Button from '../components/Button'
 import { fsAdd, fsListen } from '../firebase'
 import { WhoContext, ToastContext, RoleContext } from '../App'
+import { notifyPartner } from '../push'
 
 const ANNIVERSARY = new Date('2025-04-21T00:00:00')
 
@@ -22,7 +23,7 @@ const QUOTES = [
   "In you, I've found the love of my life and my closest, truest friend. ✨",
 ]
 
-const MOODS = ['😍', '🥰', '😊', '🌸', '😢', '💭', '✨', '💕', '😄', '🤗']
+const MOODS = ['😍', '🥰', '😊', '🌸', '😢', '💭', '✨', '💕', '😄', '🤗', '😠']
 
 function useTimer() {
   const [time, setTime] = useState({ days: 0, hours: 0, mins: 0, secs: 0 })
@@ -88,6 +89,11 @@ export default function Home() {
     try {
       await fsAdd('moods', { who, emoji, date: new Date().toISOString() })
       showToast(`${who}'s mood logged: ${emoji}`)
+      notifyPartner(who, {
+        title: `${who} is feeling ${emoji}`,
+        body: `${who === 'Kishan' ? 'Aditi' : 'Kishan'}, check how ${who} is feeling today!`,
+        url: '/'
+      })
     } catch { showToast('Error saving mood') }
     setLoggingMood(false)
   }

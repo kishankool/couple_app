@@ -1,7 +1,7 @@
 // src/firebase.js
 import { initializeApp } from 'firebase/app'
 import {
-  getFirestore, collection, addDoc, deleteDoc, doc,
+  getFirestore, collection, addDoc, deleteDoc, doc, setDoc,
   query, orderBy, onSnapshot, updateDoc, serverTimestamp
 } from 'firebase/firestore'
 import imageCompression from 'browser-image-compression'
@@ -21,6 +21,7 @@ export const db = getFirestore(app)
 export const fsAdd    = (col, data) => addDoc(collection(db, col), { ...data, createdAt: serverTimestamp() })
 export const fsDelete = (col, id)   => deleteDoc(doc(db, col, id))
 export const fsUpdate = (col, id, data) => updateDoc(doc(db, col, id), data)
+export const fsSet    = (col, id, data) => setDoc(doc(db, col, id), { ...data, updatedAt: serverTimestamp() }, { merge: true })
 
 // Listen to ALL docs in a collection (no limit)
 // Previously had limit(100) which could block additions if Firestore index wasn't created

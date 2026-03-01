@@ -5,6 +5,7 @@ import WhoSelector from '../components/WhoSelector'
 import ImageUpload from '../components/ImageUpload'
 import { fsAdd, fsDelete, fsListen, uploadImageCloudinary } from '../firebase'
 import { WhoContext, ToastContext } from '../App'
+import { notifyPartner } from '../push'
 
 const TABS = [
   { key: 'photos', icon: '🤳', label: 'Photos' },
@@ -66,6 +67,13 @@ export default function Updates() {
       resetPhotoForm()
       setPhotoOpen(false)
       showToast('Photo posted! 🤳')
+      try {
+        await notifyPartner(pWho, {
+          title: '🤳 New photo posted!',
+          body: `${pWho} just shared a new photo${pCaption ? ': ' + pCaption : ''}`,
+          url: '/updates'
+        })
+      } catch (e) { console.warn('Push failed:', e) }
     } catch { showToast('Error uploading photo') }
     setPSaving(false)
   }
@@ -84,6 +92,13 @@ export default function Updates() {
       resetLocForm()
       setLocOpen(false)
       showToast('Location shared! 📍')
+      try {
+        await notifyPartner(lWho, {
+          title: '📍 Location shared!',
+          body: `${lWho} is at ${lName.trim()}${lNote ? ' — ' + lNote : ''}`,
+          url: '/updates'
+        })
+      } catch (e) { console.warn('Push failed:', e) }
     } catch { showToast('Error sharing location') }
     setLSaving(false)
   }

@@ -7,272 +7,161 @@ import { ToastContext } from '../App'
 
 /* ─── Constants ─── */
 const JOURNEY_KEY = 'ka_memory_journey_seen'
-const TAPE_COLORS = [
-  'rgba(232,160,160,0.55)', 'rgba(181,201,181,0.55)', 'rgba(212,169,106,0.45)',
-  'rgba(155,107,123,0.45)', 'rgba(200,180,220,0.45)', 'rgba(180,200,230,0.45)',
+const EMOJIS_BY_MONTH = {
+  '01': '❄️', '02': '💕', '03': '🌸', '04': '🌷',
+  '05': '☀️', '06': '🌻', '07': '🌊', '08': '⭐',
+  '09': '🍂', '10': '🎃', '11': '🍁', '12': '🎄',
+}
+const PATH_COLORS = [
+  '#e8a0a0', '#b5c9b5', '#c9b5c9', '#b5bec9', '#c9c3b5', '#b5c9c0',
 ]
-const STICKERS = ['🌸', '💕', '✨', '🦋', '🌷', '💫', '🌺', '💗', '🌹', '🎀', '🍃', '💞']
-const TAPE_ANGLES = [-8, -3, 5, -6, 2, 7, -4, 3]
 
 /* ─── Helpers ─── */
 function formatDate(d) {
   try {
-    return new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    return new Date(d + 'T12:00:00').toLocaleDateString('en-IN', {
+      day: 'numeric', month: 'short', year: 'numeric',
+    })
   } catch { return d }
 }
 
 function formatMonthYear(d) {
   try {
-    return new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+    return new Date(d + 'T12:00:00').toLocaleDateString('en-IN', {
+      month: 'long', year: 'numeric',
+    })
   } catch { return d }
 }
 
-function groupByMonth(memories) {
-  const sorted = [...memories].sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-  const groups = []
-  let currentKey = ''
-  for (const m of sorted) {
-    const key = m.date ? m.date.substring(0, 7) : 'unknown'
-    if (key !== currentKey) {
-      currentKey = key
-      groups.push({ key, label: m.date ? formatMonthYear(m.date) : 'Undated', items: [] })
-    }
-    groups[groups.length - 1].items.push(m)
-  }
-  return groups
+function getMonthEmoji(dateStr) {
+  if (!dateStr) return '📸'
+  const month = dateStr.substring(5, 7)
+  return EMOJIS_BY_MONTH[month] || '📸'
 }
 
-/* ─── Scrapbook decorations (deterministic per memory) ─── */
-function getDecorations(id, index) {
-  const hash = id ? id.charCodeAt(0) + id.charCodeAt(id.length - 1) : index
-  return {
-    tapeColor: TAPE_COLORS[hash % TAPE_COLORS.length],
-    tapeAngle: TAPE_ANGLES[hash % TAPE_ANGLES.length],
-    sticker: STICKERS[hash % STICKERS.length],
-    stickerPos: hash % 4, // 0=topLeft 1=topRight 2=bottomLeft 3=bottomRight
-    rotate: ((hash % 7) - 3) * 1.2,
-    tapeStyle: hash % 3, // 0=top 1=corner 2=double
-  }
+function getDaysBetween(d1, d2) {
+  try {
+    const a = new Date(d1 + 'T12:00:00')
+    const b = new Date(d2 + 'T12:00:00')
+    return Math.round(Math.abs(b - a) / (1000 * 60 * 60 * 24))
+  } catch { return 0 }
 }
 
 /* ═══════════════════════════════════════════
-   MEMORY JOURNEY — full-screen walkthrough
+   TIMELINE NODE — an interactive waypoint
    ═══════════════════════════════════════════ */
-function MemoryJourney({ memories, onFinish }) {
-  const [current, setCurrent] = useState(-1) // -1 = intro
-  const [fade, setFade] = useState('in')
-  const timerRef = useRef(null)
-  const sorted = useMemo(() =>
-    [...memories].sort((a, b) => (a.date || '').localeCompare(b.date || '')),
-    [memories]
-  )
+function TimelineNode({ memory: m, index, total, isActive, onActivate, onDelete, isLeft }) {
+  const nodeRef = useRef(null)
 
-  const goNext = useCallback(() => {
-    if (current >= sorted.length - 1) {
-      onFinish()
-      return
-    }
-    setFade('out')
-    setTimeout(() => {
-      setCurrent(c => c + 1)
-      setFade('in')
-    }, 500)
-  }, [current, sorted.length, onFinish])
-
-  const goPrev = useCallback(() => {
-    if (current <= -1) return
-    setFade('out')
-    setTimeout(() => {
-      setCurrent(c => c - 1)
-      setFade('in')
-    }, 500)
-  }, [current])
-
-  // Auto-advance intro after 3s
   useEffect(() => {
-    if (current === -1) {
-      timerRef.current = setTimeout(goNext, 3500)
-      return () => clearTimeout(timerRef.current)
+    if (isActive && nodeRef.current) {
+      nodeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
-  }, [current, goNext])
+  }, [isActive])
 
-  const m = current >= 0 ? sorted[current] : null
-  const progress = (current + 1) / sorted.length
-
-  return (
-    <div style={jStyles.container} className="memory-journey">
-      {/* Background image with blur */}
-      {m?.imgUrl && (
-        <div
-          key={`bg-${current}`}
-          style={{ ...jStyles.bgImage, backgroundImage: `url(${m.imgUrl})` }}
-          className={`journey-bg journey-fade-${fade}`}
-        />
-      )}
-      <div style={jStyles.overlay} />
-
-      {/* Skip button */}
-      <button style={jStyles.skipBtn} onClick={onFinish}>
-        Skip →
-      </button>
-
-      {/* Content */}
-      <div style={jStyles.content} className={`journey-fade-${fade}`}>
-        {current === -1 ? (
-          // Intro screen
-          <div style={jStyles.introWrap}>
-            <div style={jStyles.introEmoji}>📖</div>
-            <div style={jStyles.introTitle}>Our Memory Journey</div>
-            <div style={jStyles.introSub}>
-              Let's walk through our beautiful moments together…
-            </div>
-            <div style={jStyles.introHint}>✨ Tap to begin ✨</div>
-          </div>
-        ) : m ? (
-          // Memory slide
-          <div style={jStyles.slideWrap}>
-            <div style={jStyles.polaroidFrame}>
-              {m.imgUrl ? (
-                <img src={m.imgUrl} alt={m.title} style={jStyles.slideImg} />
-              ) : (
-                <div style={jStyles.slidePlaceholder}>📸</div>
-              )}
-              {/* Tape decoration */}
-              <div style={jStyles.tapeTop} />
-            </div>
-            <div style={jStyles.slideInfo}>
-              <div style={jStyles.slideTitle}>{m.title}</div>
-              {m.caption && <div style={jStyles.slideCaption}>"{m.caption}"</div>}
-              <div style={jStyles.slideDate}>{m.date ? formatDate(m.date) : ''}</div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      {/* Navigation */}
-      <div style={jStyles.navBar}>
-        {/* Progress dots */}
-        <div style={jStyles.progressBar}>
-          <div style={{ ...jStyles.progressFill, width: `${Math.max(progress * 100, 3)}%` }} />
-        </div>
-        <div style={jStyles.navRow}>
-          <button
-            style={{ ...jStyles.navBtn, opacity: current <= -1 ? 0.3 : 1 }}
-            onClick={goPrev}
-            disabled={current <= -1}
-          >
-            ← Back
-          </button>
-          <span style={jStyles.counter}>
-            {current >= 0 ? `${current + 1} / ${sorted.length}` : `${sorted.length} memories`}
-          </span>
-          <button style={jStyles.navBtn} onClick={goNext}>
-            {current >= sorted.length - 1 ? 'Done 💕' : 'Next →'}
-          </button>
-        </div>
-      </div>
-
-      {/* Touch areas for swiping */}
-      <div style={jStyles.touchLeft} onClick={goPrev} />
-      <div style={jStyles.touchRight} onClick={goNext} />
-    </div>
-  )
-}
-
-/* ═══════════════════════════════════════
-   SCRAPBOOK PAGE — a memory card
-   ═══════════════════════════════════════ */
-function ScrapbookCard({ memory: m, index, onClick, onDelete }) {
-  const d = getDecorations(m.id, index)
-  const isLeft = index % 2 === 0
+  const del = (e) => {
+    e.stopPropagation()
+    onDelete(m)
+  }
 
   return (
     <div
-      onClick={onClick}
-      style={{
-        ...S.card,
-        transform: `rotate(${d.rotate}deg)`,
-        animationDelay: `${Math.min(index * 0.06, 0.5)}s`,
-      }}
+      ref={nodeRef}
+      className={`tl-node ${isActive ? 'tl-node-active' : ''} ${isLeft ? 'tl-left' : 'tl-right'}`}
+      style={{ animationDelay: `${Math.min(index * 0.1, 1)}s` }}
     >
-      {/* Washi tape */}
-      {d.tapeStyle === 0 && (
-        <div style={{
-          ...S.tape, ...S.tapeTop,
-          background: d.tapeColor,
-          transform: `rotate(${d.tapeAngle}deg)`,
-        }} />
-      )}
-      {d.tapeStyle === 1 && (
-        <div style={{
-          ...S.tape, ...S.tapeCorner,
-          background: d.tapeColor,
-          transform: `rotate(${isLeft ? 35 : -35}deg)`,
-          [isLeft ? 'left' : 'right']: -8,
-          [isLeft ? 'right' : 'left']: 'auto',
-        }} />
-      )}
-      {d.tapeStyle === 2 && (
-        <>
-          <div style={{
-            ...S.tape, ...S.tapeLeft,
-            background: d.tapeColor,
-            transform: `rotate(${-15 + d.tapeAngle}deg)`,
-          }} />
-          <div style={{
-            ...S.tape, ...S.tapeRight,
-            background: d.tapeColor,
-            transform: `rotate(${15 - d.tapeAngle}deg)`,
-          }} />
-        </>
-      )}
+      {/* Date waypoint on the line */}
+      <div className="tl-waypoint" onClick={() => onActivate(m.id)}>
+        <div className={`tl-dot ${isActive ? 'tl-dot-active' : ''}`}>
+          <span className="tl-dot-emoji">{getMonthEmoji(m.date)}</span>
+        </div>
+        <div className="tl-date-label">{m.date ? formatDate(m.date) : ''}</div>
+      </div>
 
-      {/* Photo */}
-      <div style={S.photoFrame}>
-        {m.imgUrl ? (
-          <img src={m.imgUrl} alt={m.title} style={S.photo} loading="lazy" />
-        ) : (
-          <div style={S.photoPlaceholder}>📸</div>
+      {/* Connector arm */}
+      <div className={`tl-arm ${isLeft ? 'tl-arm-left' : 'tl-arm-right'}`} />
+
+      {/* Memory card */}
+      <div
+        className={`tl-card ${isActive ? 'tl-card-open' : 'tl-card-closed'}`}
+        onClick={() => onActivate(m.id)}
+      >
+        {/* Compact preview (when closed) */}
+        {!isActive && (
+          <div className="tl-card-preview">
+            {m.imgUrl && (
+              <img src={m.imgUrl} alt={m.title} className="tl-card-thumb" loading="lazy" />
+            )}
+            <div className="tl-card-preview-text">
+              <div className="tl-card-mini-title">{m.title}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Expanded (when active) */}
+        {isActive && (
+          <div className="tl-card-expanded">
+            {m.imgUrl ? (
+              <img src={m.imgUrl} alt={m.title} className="tl-card-img" />
+            ) : (
+              <div className="tl-card-placeholder">📸</div>
+            )}
+            <div className="tl-card-body">
+              <div className="tl-card-title">{m.title}</div>
+              {m.caption && <div className="tl-card-caption">"{m.caption}"</div>}
+              <div className="tl-card-date">{m.date ? formatDate(m.date) : ''}</div>
+            </div>
+            <button type="button" className="tl-card-del" onClick={del} aria-label={`Delete: ${m.title}`}>
+              ✕
+            </button>
+          </div>
         )}
       </div>
-
-      {/* Handwritten info */}
-      <div style={S.info}>
-        <div style={S.title}>{m.title}</div>
-        {m.caption && <div style={S.caption}>{m.caption}</div>}
-        <div style={S.date}>{m.date ? formatDate(m.date) : ''}</div>
-      </div>
-
-      {/* Sticker */}
-      <div style={{
-        ...S.sticker,
-        ...S[`stickerPos${d.stickerPos}`],
-      }}>
-        {d.sticker}
-      </div>
-
-      {/* Delete */}
-      <button
-        type="button"
-        style={S.delBtn}
-        onClick={onDelete}
-        title="Delete"
-        aria-label={`Delete memory: ${m.title}`}
-      >✕</button>
     </div>
   )
 }
 
-/* ═══════════════════════════════════════
+/* ═══════════════════════════════════════════
+   JOURNEY CONTROLS — auto-play overlay
+   ═══════════════════════════════════════════ */
+function JourneyControls({ current, total, isPlaying, onPlay, onPause, onPrev, onNext, onExit }) {
+  return (
+    <div className="journey-controls">
+      <div className="journey-progress-bar">
+        <div
+          className="journey-progress-fill"
+          style={{ width: `${((current + 1) / total) * 100}%` }}
+        />
+      </div>
+      <div className="journey-controls-row">
+        <button className="journey-btn" onClick={onExit}>✕</button>
+        <button className="journey-btn" onClick={onPrev} disabled={current <= 0}>←</button>
+        <button className="journey-btn journey-btn-play" onClick={isPlaying ? onPause : onPlay}>
+          {isPlaying ? '⏸' : '▶'}
+        </button>
+        <button className="journey-btn" onClick={onNext} disabled={current >= total - 1}>→</button>
+        <span className="journey-counter">{current + 1} / {total}</span>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════
    MAIN COMPONENT
-   ═══════════════════════════════════════ */
+   ═══════════════════════════════════════════ */
 export default function Memories() {
   const showToast = useContext(ToastContext)
   const [memories, setMemories] = useState([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
-  const [selected, setSelected] = useState(null)
-  const [showJourney, setShowJourney] = useState(false)
+  const [selected, setSelected] = useState(null) // for view modal
+  const [activeId, setActiveId] = useState(null)
+
+  // Journey auto-play state
+  const [isJourney, setIsJourney] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [journeyIndex, setJourneyIndex] = useState(0)
+  const playTimer = useRef(null)
 
   // Form state
   const [title, setTitle] = useState('')
@@ -282,6 +171,12 @@ export default function Memories() {
   const [preview, setPreview] = useState(null)
   const [saving, setSaving] = useState(false)
 
+  // Sort memories chronologically (oldest first for the timeline)
+  const sorted = useMemo(() =>
+    [...memories].sort((a, b) => (a.date || '').localeCompare(b.date || '')),
+    [memories]
+  )
+
   useEffect(() => {
     const unsub = fsListen('memories', data => {
       setMemories(data)
@@ -290,17 +185,56 @@ export default function Memories() {
     return unsub
   }, [])
 
-  // Show journey on first visit (only if there are memories)
+  // First visit → start journey automatically
   useEffect(() => {
-    if (!loading && memories.length > 0 && !localStorage.getItem(JOURNEY_KEY)) {
-      setShowJourney(true)
+    if (!loading && sorted.length > 0 && !localStorage.getItem(JOURNEY_KEY)) {
+      startJourney()
     }
-  }, [loading, memories.length])
+  }, [loading, sorted.length])
 
-  const finishJourney = useCallback(() => {
+  // Auto-play timer
+  useEffect(() => {
+    if (isPlaying && isJourney && sorted.length > 0) {
+      playTimer.current = setTimeout(() => {
+        if (journeyIndex < sorted.length - 1) {
+          setJourneyIndex(i => i + 1)
+        } else {
+          setIsPlaying(false)
+          localStorage.setItem(JOURNEY_KEY, '1')
+        }
+      }, 3500)
+      return () => clearTimeout(playTimer.current)
+    }
+  }, [isPlaying, journeyIndex, isJourney, sorted.length])
+
+  // Sync journey index with active node
+  useEffect(() => {
+    if (isJourney && sorted[journeyIndex]) {
+      setActiveId(sorted[journeyIndex].id)
+    }
+  }, [journeyIndex, isJourney, sorted])
+
+  const startJourney = useCallback(() => {
+    setIsJourney(true)
+    setJourneyIndex(0)
+    setIsPlaying(true)
+    if (sorted.length > 0) setActiveId(sorted[0].id)
+  }, [sorted])
+
+  const stopJourney = useCallback(() => {
+    setIsJourney(false)
+    setIsPlaying(false)
     localStorage.setItem(JOURNEY_KEY, '1')
-    setShowJourney(false)
   }, [])
+
+  const handleActivate = useCallback((id) => {
+    // If journey is playing, pause it when user taps a node
+    if (isPlaying) setIsPlaying(false)
+    setActiveId(prev => prev === id ? null : id)
+    // Update journey index to match
+    const idx = sorted.findIndex(m => m.id === id)
+    if (idx >= 0) setJourneyIndex(idx)
+  }, [isPlaying, sorted])
 
   const handleFile = (f) => {
     if (preview) URL.revokeObjectURL(preview)
@@ -324,52 +258,48 @@ export default function Memories() {
         caption: caption.trim(),
         date: date || new Date().toLocaleDateString('en-CA'),
         imgUrl,
-        rotate: (Math.random() * 6 - 3).toFixed(2),
       })
       resetForm()
       setOpen(false)
       showToast('Memory saved! 📸')
     } catch (e) {
       console.error(e)
-      showToast('Error saving memory — check Cloudinary config')
+      showToast('Error saving memory')
     }
     setSaving(false)
   }
 
-  const del = async (m, e) => {
-    if (e) e.stopPropagation()
+  const del = async (m) => {
     try {
       await fsDelete('memories', m.id)
+      if (activeId === m.id) setActiveId(null)
       showToast('Memory deleted')
     } catch {
       showToast('Error deleting')
     }
   }
 
-  const groups = useMemo(() => groupByMonth(memories), [memories])
+  // ─── Compute timeline stats ───
+  const stats = useMemo(() => {
+    if (sorted.length < 2) return null
+    const days = getDaysBetween(sorted[0].date, sorted[sorted.length - 1].date)
+    return { days, start: sorted[0].date, end: sorted[sorted.length - 1].date }
+  }, [sorted])
 
-  // ─── Journey Mode ───
-  if (showJourney && memories.length > 0) {
-    return <MemoryJourney memories={memories} onFinish={finishJourney} />
-  }
-
-  // ─── Scrapbook Mode ───
   return (
     <div className="page-content">
       {/* Header */}
-      <div style={S.header}>
+      <div className="tl-header">
         <div>
-          <div style={S.pageTitle}>📖 Our Scrapbook</div>
-          <div style={S.pageSub}>
-            {memories.length} {memories.length === 1 ? 'memory' : 'memories'} · sorted by date
+          <div className="tl-page-title">📍 Memory Timeline</div>
+          <div className="tl-page-sub">
+            {sorted.length} {sorted.length === 1 ? 'memory' : 'memories'}
+            {stats && ` · ${stats.days} days of love`}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {memories.length > 0 && (
-            <Button size="sm" variant="ghost" onClick={() => {
-              localStorage.removeItem(JOURNEY_KEY)
-              setShowJourney(true)
-            }}>
+          {sorted.length > 1 && (
+            <Button size="sm" variant="ghost" onClick={startJourney}>
               ▶ Journey
             </Button>
           )}
@@ -377,45 +307,83 @@ export default function Memories() {
         </div>
       </div>
 
-      {/* Scrapbook content */}
-      <div style={S.scrapbook}>
+      {/* Timeline Map */}
+      <div className="tl-map">
         {loading ? (
           <div className="loading">🌸</div>
-        ) : memories.length === 0 ? (
+        ) : sorted.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">📖</div>
-            <p>No memories yet.<br />Start your scrapbook!</p>
+            <div className="empty-icon">📍</div>
+            <p>No memories yet.<br />Start your journey!</p>
           </div>
         ) : (
-          groups.map((group, gi) => (
-            <div key={group.key} style={{ marginBottom: 28 }}>
-              {/* Month/Year divider */}
-              <div style={S.monthDivider}>
-                <div style={S.dividerLine} />
-                <span style={S.monthLabel}>{group.label}</span>
-                <div style={S.dividerLine} />
-              </div>
+          <>
+            {/* Timeline start marker */}
+            <div className="tl-start-marker">
+              <div className="tl-start-flag">🏁</div>
+              <div className="tl-start-label">Our story begins…</div>
+              {sorted[0]?.date && (
+                <div className="tl-start-date">{formatDate(sorted[0].date)}</div>
+              )}
+            </div>
 
-              {/* Cards grid */}
-              <div style={S.grid}>
-                {group.items.map((m, i) => (
-                  <ScrapbookCard
-                    key={m.id}
-                    memory={m}
-                    index={gi * 10 + i}
-                    onClick={() => setSelected(m)}
-                    onDelete={(e) => del(m, e)}
-                  />
-                ))}
+            {/* The vertical path */}
+            <div className="tl-path">
+              {sorted.map((m, i) => {
+                const isLeft = i % 2 === 0
+                // Day gap indicator between memories
+                const gap = i > 0 ? getDaysBetween(sorted[i - 1].date, m.date) : 0
+                return (
+                  <React.Fragment key={m.id}>
+                    {/* Day gap badge */}
+                    {gap > 0 && (
+                      <div className="tl-gap-badge">
+                        <span className="tl-gap-line" />
+                        <span className="tl-gap-text">
+                          {gap === 1 ? 'next day' : `${gap} days later`}
+                        </span>
+                        <span className="tl-gap-line" />
+                      </div>
+                    )}
+
+                    <TimelineNode
+                      memory={m}
+                      index={i}
+                      total={sorted.length}
+                      isActive={activeId === m.id}
+                      onActivate={handleActivate}
+                      onDelete={del}
+                      isLeft={isLeft}
+                    />
+                  </React.Fragment>
+                )
+              })}
+            </div>
+
+            {/* Timeline end marker */}
+            <div className="tl-end-marker">
+              <div className="tl-end-heart">💕</div>
+              <div className="tl-end-label">
+                {stats ? `${stats.days} days & counting…` : 'To be continued…'}
               </div>
             </div>
-          ))
+          </>
         )}
-
-        {/* Scrapbook corner decorations */}
-        <div style={S.cornerTL}>🌸</div>
-        <div style={S.cornerBR}>💕</div>
       </div>
+
+      {/* Journey auto-play controls */}
+      {isJourney && sorted.length > 0 && (
+        <JourneyControls
+          current={journeyIndex}
+          total={sorted.length}
+          isPlaying={isPlaying}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onPrev={() => { setIsPlaying(false); setJourneyIndex(i => Math.max(0, i - 1)) }}
+          onNext={() => { setIsPlaying(false); setJourneyIndex(i => Math.min(sorted.length - 1, i + 1)) }}
+          onExit={stopJourney}
+        />
+      )}
 
       {/* Add Memory Modal */}
       <Modal open={open} onClose={() => setOpen(false)} title="📸 Add a Memory">
@@ -424,512 +392,9 @@ export default function Memories() {
         <input value={caption} onChange={e => setCaption(e.target.value)} placeholder="Caption / note (optional)" style={{ marginBottom: 10 }} />
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ marginBottom: 16 }} />
         <Button size="full" onClick={save} disabled={saving}>
-          {saving ? 'Developing your polaroid… 📸' : 'Save Memory 🌸'}
+          {saving ? 'Saving memory… 📸' : 'Save Memory 🌸'}
         </Button>
-      </Modal>
-
-      {/* View Modal */}
-      <Modal open={!!selected} onClose={() => setSelected(null)} title="">
-        {selected && (
-          <div style={{ textAlign: 'center' }}>
-            <div style={S.viewPolaroid}>
-              {selected.imgUrl
-                ? <img src={selected.imgUrl} alt={selected.title} style={S.viewImg} />
-                : <div style={S.viewPlaceholder}>📸</div>
-              }
-              <div style={S.viewInfo}>
-                <div style={S.viewTitle}>{selected.title}</div>
-                {selected.caption && <div style={S.viewCaption}>"{selected.caption}"</div>}
-                <div style={S.viewDate}>{selected.date ? formatDate(selected.date) : ''}</div>
-              </div>
-            </div>
-            <Button variant="danger" size="sm" style={{ marginTop: 16 }}
-              onClick={async () => {
-                try {
-                  await fsDelete('memories', selected.id)
-                  setSelected(null)
-                  showToast('Deleted')
-                } catch {
-                  showToast('Error deleting')
-                }
-              }}>
-              Delete Memory
-            </Button>
-          </div>
-        )}
       </Modal>
     </div>
   )
-}
-
-/* ═══════════════════════════════════════
-   JOURNEY STYLES
-   ═══════════════════════════════════════ */
-const jStyles = {
-  container: {
-    position: 'fixed',
-    inset: 0,
-    zIndex: 300,
-    background: '#1a0e14',
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-  },
-  bgImage: {
-    position: 'absolute',
-    inset: -20,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    filter: 'blur(30px) brightness(0.4) saturate(1.3)',
-    transition: 'opacity 0.5s ease',
-  },
-  overlay: {
-    position: 'absolute',
-    inset: 0,
-    background: 'linear-gradient(180deg, rgba(26,14,20,0.3) 0%, rgba(26,14,20,0.6) 100%)',
-  },
-  skipBtn: {
-    position: 'absolute',
-    top: 'calc(16px + env(safe-area-inset-top, 0px))',
-    right: 16,
-    zIndex: 10,
-    background: 'rgba(255,255,255,0.15)',
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
-    border: '1px solid rgba(255,255,255,0.2)',
-    borderRadius: 50,
-    color: 'rgba(255,255,255,0.85)',
-    padding: '8px 20px',
-    fontSize: '0.82rem',
-    fontFamily: 'Lato, sans-serif',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    letterSpacing: '0.5px',
-  },
-  content: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    zIndex: 2,
-    padding: '20px 24px',
-    transition: 'opacity 0.5s ease, transform 0.5s ease',
-  },
-  introWrap: {
-    textAlign: 'center',
-    color: 'white',
-  },
-  introEmoji: {
-    fontSize: '4rem',
-    marginBottom: 20,
-    animation: 'pulse 2s ease-in-out infinite',
-  },
-  introTitle: {
-    fontFamily: "'Playfair Display', serif",
-    fontSize: '2rem',
-    fontWeight: 700,
-    marginBottom: 12,
-    letterSpacing: '0.5px',
-  },
-  introSub: {
-    fontFamily: "'Caveat', cursive",
-    fontSize: '1.3rem',
-    color: 'rgba(255,255,255,0.75)',
-    marginBottom: 30,
-  },
-  introHint: {
-    fontSize: '0.85rem',
-    color: 'rgba(255,255,255,0.5)',
-    animation: 'pulse 2s ease-in-out infinite',
-    animationDelay: '1s',
-  },
-  slideWrap: {
-    textAlign: 'center',
-    maxWidth: 340,
-    width: '100%',
-  },
-  polaroidFrame: {
-    background: '#fffdf5',
-    padding: '10px 10px 0',
-    borderRadius: 3,
-    boxShadow: '0 12px 40px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)',
-    position: 'relative',
-    marginBottom: 0,
-  },
-  slideImg: {
-    width: '100%',
-    aspectRatio: '4/5',
-    objectFit: 'cover',
-    display: 'block',
-    borderRadius: 2,
-    filter: 'contrast(1.04) saturate(0.95)',
-  },
-  slidePlaceholder: {
-    width: '100%',
-    aspectRatio: '4/5',
-    background: 'linear-gradient(135deg, #f5e8ee, #ede0e8)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '4rem',
-  },
-  tapeTop: {
-    position: 'absolute',
-    top: -10,
-    left: '50%',
-    transform: 'translateX(-50%) rotate(-2deg)',
-    width: 80,
-    height: 22,
-    background: 'rgba(232,160,160,0.55)',
-    borderRadius: 2,
-  },
-  slideInfo: {
-    background: '#fffdf5',
-    padding: '14px 10px 20px',
-    borderRadius: '0 0 3px 3px',
-    marginBottom: 0,
-  },
-  slideTitle: {
-    fontFamily: "'Caveat', cursive",
-    fontSize: '1.5rem',
-    fontWeight: 600,
-    color: '#4a3040',
-  },
-  slideCaption: {
-    fontFamily: "'Reenie Beanie', cursive",
-    fontSize: '1.15rem',
-    color: '#9b6b7b',
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  slideDate: {
-    fontFamily: "'Caveat', cursive",
-    fontSize: '0.95rem',
-    color: '#b89090',
-    marginTop: 6,
-  },
-  navBar: {
-    position: 'relative',
-    zIndex: 5,
-    padding: '0 20px calc(20px + env(safe-area-inset-bottom, 0px))',
-  },
-  progressBar: {
-    height: 3,
-    background: 'rgba(255,255,255,0.15)',
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  progressFill: {
-    height: '100%',
-    background: 'linear-gradient(90deg, var(--rose), var(--mauve))',
-    borderRadius: 2,
-    transition: 'width 0.5s ease',
-  },
-  navRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  navBtn: {
-    background: 'rgba(255,255,255,0.12)',
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
-    border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: 50,
-    color: 'white',
-    padding: '10px 22px',
-    fontSize: '0.85rem',
-    fontFamily: 'Lato, sans-serif',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    letterSpacing: '0.3px',
-  },
-  counter: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: '0.8rem',
-    fontFamily: "'Caveat', cursive",
-    letterSpacing: '0.5px',
-  },
-  touchLeft: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '30%',
-    height: '70%',
-    zIndex: 3,
-    cursor: 'pointer',
-  },
-  touchRight: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: '30%',
-    height: '70%',
-    zIndex: 3,
-    cursor: 'pointer',
-  },
-}
-
-/* ═══════════════════════════════════════
-   SCRAPBOOK STYLES
-   ═══════════════════════════════════════ */
-const S = {
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  pageTitle: {
-    fontFamily: "'Playfair Display', serif",
-    fontSize: '1.1rem',
-    color: 'var(--mauve-deep)',
-  },
-  pageSub: {
-    fontSize: '0.75rem',
-    color: 'var(--text-light)',
-    marginTop: 2,
-  },
-
-  // Scrapbook container
-  scrapbook: {
-    position: 'relative',
-    background: 'linear-gradient(180deg, #fef5f0 0%, #fdf0f2 30%, #f5eff5 70%, #f0f5f0 100%)',
-    borderRadius: 20,
-    padding: '24px 14px 32px',
-    boxShadow: 'inset 0 2px 12px rgba(200,120,140,0.08), 0 4px 20px rgba(100,60,80,0.08)',
-    border: '1px solid rgba(232,160,160,0.15)',
-    minHeight: 300,
-    overflow: 'hidden',
-  },
-
-  // Month dividers
-  monthDivider: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
-    padding: '0 4px',
-  },
-  dividerLine: {
-    flex: 1,
-    height: 2,
-    background: 'linear-gradient(90deg, transparent, rgba(232,160,160,0.35), transparent)',
-    borderRadius: 1,
-  },
-  monthLabel: {
-    fontFamily: "'Playfair Display', serif",
-    fontSize: '0.9rem',
-    color: 'var(--mauve)',
-    fontWeight: 600,
-    whiteSpace: 'nowrap',
-    letterSpacing: '0.5px',
-  },
-
-  // Card grid
-  grid: {
-    columns: 2,
-    columnGap: 16,
-    columnFill: 'balance',
-  },
-
-  // Scrapbook card
-  card: {
-    breakInside: 'avoid',
-    display: 'inline-block',
-    width: '100%',
-    background: '#fffdf5',
-    padding: '8px 8px 16px',
-    borderRadius: 3,
-    marginBottom: 18,
-    cursor: 'pointer',
-    position: 'relative',
-    boxShadow: '0 3px 12px rgba(100,60,80,0.12), 0 1px 3px rgba(0,0,0,0.05)',
-    transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s',
-    animation: 'fadeUp 0.4s ease both',
-    WebkitTapHighlightColor: 'transparent',
-  },
-
-  // Washi tape styles
-  tape: {
-    position: 'absolute',
-    height: 18,
-    borderRadius: 1,
-    zIndex: 3,
-    opacity: 0.85,
-    boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-  },
-  tapeTop: {
-    top: -8,
-    left: '50%',
-    marginLeft: -30,
-    width: 60,
-  },
-  tapeCorner: {
-    top: -5,
-    width: 50,
-  },
-  tapeLeft: {
-    top: -6,
-    left: -6,
-    width: 45,
-  },
-  tapeRight: {
-    top: -6,
-    right: -6,
-    width: 45,
-  },
-
-  // Photo
-  photoFrame: {
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  photo: {
-    width: '100%',
-    aspectRatio: '1',
-    objectFit: 'cover',
-    display: 'block',
-    filter: 'contrast(1.04) saturate(0.95)',
-  },
-  photoPlaceholder: {
-    width: '100%',
-    aspectRatio: '1',
-    background: 'linear-gradient(135deg, #f5e8ee, #ede0e8)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '2rem',
-    borderRadius: 2,
-  },
-
-  // Info
-  info: {
-    paddingTop: 8,
-    textAlign: 'center',
-    minHeight: 36,
-  },
-  title: {
-    fontFamily: "'Caveat', cursive",
-    fontSize: '0.92rem',
-    fontWeight: 600,
-    color: '#4a3040',
-    lineHeight: 1.3,
-  },
-  caption: {
-    fontFamily: "'Reenie Beanie', cursive",
-    fontSize: '0.88rem',
-    color: '#9b6b7b',
-    marginTop: 2,
-    lineHeight: 1.3,
-  },
-  date: {
-    fontFamily: "'Caveat', cursive",
-    fontSize: '0.7rem',
-    color: '#b89090',
-    marginTop: 3,
-  },
-
-  // Sticker
-  sticker: {
-    position: 'absolute',
-    fontSize: '1.1rem',
-    zIndex: 4,
-    pointerEvents: 'none',
-    filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.1))',
-    transition: 'transform 0.3s ease',
-  },
-  stickerPos0: { top: -6, left: -4 },
-  stickerPos1: { top: -6, right: -4 },
-  stickerPos2: { bottom: 2, left: -4 },
-  stickerPos3: { bottom: 2, right: -4 },
-
-  // Delete button
-  delBtn: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    background: 'rgba(0,0,0,0.35)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '50%',
-    width: 22,
-    height: 22,
-    fontSize: '0.55rem',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    opacity: 0,
-    transition: 'opacity 0.2s',
-    zIndex: 5,
-    WebkitTapHighlightColor: 'transparent',
-  },
-
-  // Corner decorations
-  cornerTL: {
-    position: 'absolute',
-    top: 8,
-    left: 10,
-    fontSize: '1.2rem',
-    opacity: 0.25,
-    pointerEvents: 'none',
-  },
-  cornerBR: {
-    position: 'absolute',
-    bottom: 10,
-    right: 12,
-    fontSize: '1.2rem',
-    opacity: 0.25,
-    pointerEvents: 'none',
-  },
-
-  // View modal
-  viewPolaroid: {
-    background: '#fffdf5',
-    padding: '12px 12px 24px',
-    boxShadow: '0 8px 30px rgba(100,60,80,0.2)',
-    borderRadius: 3,
-    display: 'inline-block',
-    maxWidth: '100%',
-    width: '100%',
-  },
-  viewImg: {
-    width: '100%',
-    maxHeight: 320,
-    objectFit: 'cover',
-    borderRadius: 2,
-    filter: 'contrast(1.04) saturate(0.95)',
-  },
-  viewPlaceholder: {
-    width: '100%',
-    height: 220,
-    background: '#f5e8ee',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '4rem',
-  },
-  viewInfo: { paddingTop: 14, textAlign: 'center' },
-  viewTitle: {
-    fontFamily: "'Caveat', cursive",
-    fontSize: '1.4rem',
-    fontWeight: 600,
-    color: '#4a3040',
-  },
-  viewCaption: {
-    fontFamily: "'Reenie Beanie', cursive",
-    fontSize: '1.2rem',
-    color: '#9b6b7b',
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  viewDate: {
-    fontFamily: "'Caveat', cursive",
-    fontSize: '0.95rem',
-    color: '#b89090',
-    marginTop: 5,
-  },
 }

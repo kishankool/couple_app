@@ -48,9 +48,111 @@ function getDaysBetween(d1, d2) {
 }
 
 /* ═══════════════════════════════════════════
+   CURVED PATH SVG — snaking bezier between dots
+   ═══════════════════════════════════════════ */
+function CurvedPathSVG({ pathRef, dotRefs, count }) {
+  const [pathD, setPathD] = useState('')
+  const [size, setSize] = useState({ w: 0, h: 0 })
+
+  useEffect(() => {
+    const measure = () => {
+      if (!pathRef.current || count < 2) return
+      const cr = pathRef.current.getBoundingClientRect()
+      const centerX = cr.width / 2
+      const swing = Math.min(cr.width * 0.22, 70)
+
+      const pts = dotRefs.current
+        .slice(0, count)
+        .map(el => {
+          if (!el) return null
+          const r = el.getBoundingClientRect()
+          return {
+            x: r.left + r.width / 2 - cr.left,
+            y: r.top + r.height / 2 - cr.top,
+          }
+        })
+        .filter(Boolean)
+
+      if (pts.length < 2) return
+
+      let d = `M ${pts[0].x} ${pts[0].y}`
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p1 = pts[i]
+        const p2 = pts[i + 1]
+        const dir = i % 2 === 0 ? 1 : -1
+        const cpX = centerX + swing * dir
+        const dy = p2.y - p1.y
+        d += ` C ${cpX} ${p1.y + dy * 0.38}, ${cpX} ${p2.y - dy * 0.38}, ${p2.x} ${p2.y}`
+      }
+
+      setPathD(d)
+      setSize({ w: cr.width, h: cr.height })
+    }
+
+    measure()
+    // Re-measure on resize and after layout changes
+    const ro = new ResizeObserver(measure)
+    if (pathRef.current) ro.observe(pathRef.current)
+    // Also re-measure after a short delay for animations
+    const timer = setTimeout(measure, 600)
+    return () => { ro.disconnect(); clearTimeout(timer) }
+  }, [pathRef, dotRefs, count])
+
+  if (!pathD || size.h < 10) return null
+
+  return (
+    <svg
+      className="tl-curved-svg"
+      width={size.w}
+      height={size.h}
+      viewBox={`0 0 ${size.w} ${size.h}`}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        pointerEvents: 'none',
+        zIndex: 0,
+        overflow: 'visible',
+      }}
+    >
+      <defs>
+        <linearGradient id="curvedPathGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#e8a0a0" stopOpacity="0.7" />
+          <stop offset="25%" stopColor="#9b6b7b" stopOpacity="0.55" />
+          <stop offset="50%" stopColor="#b5c9b5" stopOpacity="0.55" />
+          <stop offset="75%" stopColor="#d4a96a" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#c97a7a" stopOpacity="0.7" />
+        </linearGradient>
+        <filter id="pathGlow">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      {/* Glow layer */}
+      <path d={pathD} fill="none" stroke="rgba(232,160,160,0.15)" strokeWidth="10" strokeLinecap="round" />
+      {/* Main path */}
+      <path d={pathD} fill="none" stroke="url(#curvedPathGrad)" strokeWidth="3" strokeLinecap="round" />
+      {/* Animated dashes overlay */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke="rgba(255,255,255,0.3)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray="6 14"
+        className="tl-path-flow"
+      />
+    </svg>
+  )
+}
+
+/* ═══════════════════════════════════════════
    TIMELINE NODE — an interactive waypoint
    ═══════════════════════════════════════════ */
-function TimelineNode({ memory: m, index, total, isActive, onActivate, onDelete, isLeft }) {
+function TimelineNode({ memory: m, index, total, isActive, onActivate, onDelete, isLeft, dotRef }) {
   const nodeRef = useRef(null)
 
   useEffect(() => {
@@ -72,7 +174,7 @@ function TimelineNode({ memory: m, index, total, isActive, onActivate, onDelete,
     >
       {/* Date waypoint on the line */}
       <div className="tl-waypoint" onClick={() => onActivate(m.id)}>
-        <div className={`tl-dot ${isActive ? 'tl-dot-active' : ''}`}>
+        <div ref={dotRef} className={`tl-dot ${isActive ? 'tl-dot-active' : ''}`}>
           <span className="tl-dot-emoji">{getMonthEmoji(m.date)}</span>
         </div>
         <div className="tl-date-label">{m.date ? formatDate(m.date) : ''}</div>
@@ -162,6 +264,8 @@ export default function Memories() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [journeyIndex, setJourneyIndex] = useState(0)
   const playTimer = useRef(null)
+  const pathRef = useRef(null)
+  const dotRefs = useRef([])
 
   // Form state
   const [title, setTitle] = useState('')
@@ -328,7 +432,8 @@ export default function Memories() {
             </div>
 
             {/* The vertical path */}
-            <div className="tl-path">
+            <div className="tl-path" ref={pathRef}>
+              <CurvedPathSVG pathRef={pathRef} dotRefs={dotRefs} count={sorted.length} />
               {sorted.map((m, i) => {
                 const isLeft = i % 2 === 0
                 // Day gap indicator between memories
@@ -354,6 +459,7 @@ export default function Memories() {
                       onActivate={handleActivate}
                       onDelete={del}
                       isLeft={isLeft}
+                      dotRef={el => { dotRefs.current[i] = el }}
                     />
                   </React.Fragment>
                 )

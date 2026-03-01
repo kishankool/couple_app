@@ -234,25 +234,6 @@ textarea { resize: vertical; min-height: 80px; }
   position: relative;
   padding: 0;
 }
-.tl-path::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  margin-left: -1.5px;
-  background: linear-gradient(
-    180deg,
-    var(--rose) 0%,
-    var(--mauve) 25%,
-    var(--sage) 50%,
-    var(--gold) 75%,
-    var(--rose-dark) 100%
-  );
-  border-radius: 3px;
-  opacity: 0.5;
-}
 
 /* ── Day gap badge ── */
 .tl-gap-badge {
@@ -559,6 +540,15 @@ textarea { resize: vertical; min-height: 80px; }
 @keyframes tl-ring {
   0% { transform: scale(1); opacity: 0.6; }
   100% { transform: scale(1.8); opacity: 0; }
+}
+
+@keyframes tl-flow {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -40; }
+}
+
+.tl-path-flow {
+  animation: tl-flow 2s linear infinite;
 }
 
 /* ── Responsive: stack on very narrow screens ── */

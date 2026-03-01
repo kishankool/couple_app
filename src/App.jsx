@@ -266,6 +266,9 @@ export default function App() {
                   )
                 })}
               </div>
+              <div style={styles.footerCredit}>
+                Made with 💕 by Kishan
+              </div>
             </nav>
 
             {toast && <Toast msg={toast} />}
@@ -361,6 +364,17 @@ const styles = {
   },
   navInner: {
     display: 'flex',
+  },
+  footerCredit: {
+    textAlign: 'center',
+    fontSize: '0.58rem',
+    color: 'rgba(155,107,123,0.55)',
+    fontFamily: "'Playfair Display', serif",
+    fontStyle: 'italic',
+    letterSpacing: '0.4px',
+    paddingBottom: '6px',
+    paddingTop: '2px',
+    userSelect: 'none',
   },
   navItem: {
     flex: 1,

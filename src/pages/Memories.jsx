@@ -3,7 +3,7 @@ import Modal from '../components/Modal'
 import Button from '../components/Button'
 import ImageUpload from '../components/ImageUpload'
 import { fsAdd, fsDelete, fsListen, uploadImageCloudinary } from '../firebase'
-import { ToastContext } from '../App'
+import { ToastContext, RoleContext } from '../App'
 
 /* ─── Constants ─── */
 const JOURNEY_KEY = 'ka_memory_journey_seen'
@@ -152,7 +152,7 @@ function CurvedPathSVG({ pathRef, dotRefs, count }) {
 /* ═══════════════════════════════════════════
    TIMELINE NODE — an interactive waypoint
    ═══════════════════════════════════════════ */
-function TimelineNode({ memory: m, index, total, isActive, onActivate, onDelete, isLeft, dotRef }) {
+function TimelineNode({ memory: m, index, total, isActive, onActivate, onDelete, isLeft, dotRef, canEdit }) {
   const nodeRef = useRef(null)
 
   useEffect(() => {
@@ -213,9 +213,11 @@ function TimelineNode({ memory: m, index, total, isActive, onActivate, onDelete,
               {m.caption && <div className="tl-card-caption">"{m.caption}"</div>}
               <div className="tl-card-date">{m.date ? formatDate(m.date) : ''}</div>
             </div>
-            <button type="button" className="tl-card-del" onClick={del} aria-label={`Delete: ${m.title}`}>
-              ✕
-            </button>
+            {canEdit && (
+              <button type="button" className="tl-card-del" onClick={del} aria-label={`Delete: ${m.title}`}>
+                ✕
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -253,6 +255,7 @@ function JourneyControls({ current, total, isPlaying, onPlay, onPause, onPrev, o
    ═══════════════════════════════════════════ */
 export default function Memories() {
   const showToast = useContext(ToastContext)
+  const { isVisitor } = useContext(RoleContext)
   const [memories, setMemories] = useState([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -407,7 +410,9 @@ export default function Memories() {
               ▶ Journey
             </Button>
           )}
-          <Button size="sm" onClick={() => { resetForm(); setOpen(true) }}>+ Add</Button>
+          {!isVisitor && (
+            <Button size="sm" onClick={() => { resetForm(); setOpen(true) }}>+ Add</Button>
+          )}
         </div>
       </div>
 
@@ -460,6 +465,7 @@ export default function Memories() {
                       onDelete={del}
                       isLeft={isLeft}
                       dotRef={el => { dotRefs.current[i] = el }}
+                      canEdit={!isVisitor}
                     />
                   </React.Fragment>
                 )

@@ -14,13 +14,14 @@ import LockScreen from './components/LockScreen'
 
 export const ToastContext = React.createContext(null)
 export const WhoContext = React.createContext(null)
+export const RoleContext = React.createContext({ isVisitor: false })
 
-const NAV = [
+const NAV_ALL = [
   { path: '/', icon: '🏠', label: 'Home' },
-  { path: '/notes', icon: '💌', label: 'Notes' },
+  { path: '/notes', icon: '💌', label: 'Notes', private: true },
   { path: '/memories', icon: '📸', label: 'Memories' },
-  { path: '/updates', icon: '🤳', label: 'Updates' },
-  { path: '/todos', icon: '✅', label: 'Todos' },
+  { path: '/updates', icon: '🤳', label: 'Updates', private: true },
+  { path: '/todos', icon: '✅', label: 'Todos', private: true },
   { path: '/more', icon: '🌹', label: 'More' },
 ]
 
@@ -126,7 +127,10 @@ export default function App() {
   const [who, setWhoState] = useState(() => localStorage.getItem('ka_who') || 'Kishan')
   const [showWhoModal, setShowWhoModal] = useState(false)
   const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem('ka_unlocked') === '1')
+  const [isVisitor, setIsVisitor] = useState(() => sessionStorage.getItem('ka_role') === 'visitor')
   const toastTimerRef = useRef(null)
+
+  const NAV = isVisitor ? NAV_ALL.filter(n => !n.private) : NAV_ALL
 
   const showToast = useCallback((msg) => {
     setToast(msg)
@@ -156,116 +160,135 @@ export default function App() {
 
   // Show lock screen if not yet unlocked
   if (!unlocked) {
-    return <LockScreen onUnlock={() => { setUnlocked(true); sessionStorage.setItem('ka_unlocked', '1') }} />
+    return <LockScreen onUnlock={(role) => {
+      setUnlocked(true)
+      setIsVisitor(role === 'visitor')
+      sessionStorage.setItem('ka_unlocked', '1')
+    }} />
   }
 
   return (
     <ToastContext.Provider value={showToast}>
       <WhoContext.Provider value={{ who, setWho: selectWho }}>
-        <div style={{
-          maxWidth: 480, margin: '0 auto',
-          minHeight: '100dvh',
-          display: 'flex',
-          flexDirection: 'column', position: 'relative',
-          paddingTop: 'var(--safe-top)',
-        }}>
-          <Petals />
+        <RoleContext.Provider value={{ isVisitor }}>
+          <div style={{
+            maxWidth: 480, margin: '0 auto',
+            minHeight: '100dvh',
+            display: 'flex',
+            flexDirection: 'column', position: 'relative',
+            paddingTop: 'var(--safe-top)',
+          }}>
+            <Petals />
 
-          {/* ── Top Bar ── */}
-          <header style={styles.topbar}>
-            <div style={styles.topbarTitle}>Kishan & Aditi 💕</div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <NotificationBell />
-              <button style={styles.whoTag} onClick={() => setShowWhoModal(true)}>
-                {who === 'Kishan' ? '💙' : '🌸'} {who}
-              </button>
-            </div>
-          </header>
-
-          {/* ── Pages ── */}
-          <main style={styles.main}>
-            <AnimatePresence mode="wait">
-              <Routes location={location} key={location.pathname}>
-                <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
-                <Route path="/notes" element={<PageWrapper><Notes /></PageWrapper>} />
-                <Route path="/memories" element={<PageWrapper><Memories /></PageWrapper>} />
-                <Route path="/updates" element={<PageWrapper><Updates /></PageWrapper>} />
-                <Route path="/todos" element={<PageWrapper><Todos /></PageWrapper>} />
-                <Route path="/more" element={<PageWrapper><More /></PageWrapper>} />
-              </Routes>
-            </AnimatePresence>
-          </main>
-
-          {/* ── Bottom Nav ── */}
-          <nav style={styles.nav}>
-            <div style={styles.navInner}>
-              {NAV.map(n => {
-                const active = location.pathname === n.path
-                return (
-                  <button
-                    key={n.path}
-                    id={`nav-${n.label.toLowerCase()}`}
-                    style={styles.navItem}
-                    onClick={() => navigate(n.path)}
-                  >
-                    <span style={{
-                      fontSize: '1.25rem',
-                      lineHeight: 1,
-                      transform: active ? 'scale(1.18) translateY(-2px)' : 'scale(1)',
-                      transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                      display: 'block',
-                    }}>
-                      {n.icon}
-                    </span>
-                    <span style={{
-                      fontSize: '0.58rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      color: active ? 'var(--mauve-deep)' : 'var(--text-light)',
-                      fontWeight: active ? 700 : 400,
-                      transition: 'color 0.2s, font-weight 0.2s',
-                    }}>
-                      {n.label}
-                    </span>
-                    {active && (
-                      <span style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        width: 20,
-                        height: 3,
-                        borderRadius: 2,
-                        background: 'var(--mauve-deep)',
-                        transition: 'all 0.3s',
-                      }} />
-                    )}
+            {/* ── Top Bar ── */}
+            <header style={styles.topbar}>
+              <div style={styles.topbarTitle}>Kishan & Aditi 💕</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {isVisitor ? (
+                  <button style={styles.visitorTag} onClick={() => {
+                    sessionStorage.removeItem('ka_unlocked')
+                    sessionStorage.removeItem('ka_role')
+                    setUnlocked(false)
+                    setIsVisitor(false)
+                  }}>
+                    👁️ Visitor · 🔒
                   </button>
-                )
-              })}
-            </div>
-          </nav>
+                ) : (
+                  <>
+                    <NotificationBell />
+                    <button style={styles.whoTag} onClick={() => setShowWhoModal(true)}>
+                      {who === 'Kishan' ? '💙' : '🌸'} {who}
+                    </button>
+                  </>
+                )}
+              </div>
+            </header>
 
-          {toast && <Toast msg={toast} />}
+            {/* ── Pages ── */}
+            <main style={styles.main}>
+              <AnimatePresence mode="wait">
+                <Routes location={location} key={location.pathname}>
+                  <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
+                  <Route path="/notes" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Notes /></PageWrapper>} />
+                  <Route path="/memories" element={<PageWrapper><Memories /></PageWrapper>} />
+                  <Route path="/updates" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Updates /></PageWrapper>} />
+                  <Route path="/todos" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Todos /></PageWrapper>} />
+                  <Route path="/more" element={<PageWrapper><More /></PageWrapper>} />
+                </Routes>
+              </AnimatePresence>
+            </main>
 
-          {/* ── Who are you modal ── */}
-          <Modal open={showWhoModal} onClose={() => who && setShowWhoModal(false)} title="Who's using the app? 💕">
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: 18, textAlign: 'center', lineHeight: 1.6 }}>
-              Tell us who you are so we can personalise your experience!
-            </p>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button style={styles.bigWhoBtn} onClick={() => selectWho('Kishan')}>
-                <div style={{ fontSize: '2rem', marginBottom: 6 }}>💙</div>
-                <strong>Kishan</strong>
-              </button>
-              <button style={styles.bigWhoBtn} onClick={() => selectWho('Aditi')}>
-                <div style={{ fontSize: '2rem', marginBottom: 6 }}>🌸</div>
-                <strong>Aditi</strong>
-              </button>
-            </div>
-          </Modal>
+            {/* ── Bottom Nav ── */}
+            <nav style={styles.nav}>
+              <div style={styles.navInner}>
+                {NAV.map(n => {
+                  const active = location.pathname === n.path
+                  return (
+                    <button
+                      key={n.path}
+                      id={`nav-${n.label.toLowerCase()}`}
+                      style={styles.navItem}
+                      onClick={() => navigate(n.path)}
+                    >
+                      <span style={{
+                        fontSize: '1.25rem',
+                        lineHeight: 1,
+                        transform: active ? 'scale(1.18) translateY(-2px)' : 'scale(1)',
+                        transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                        display: 'block',
+                      }}>
+                        {n.icon}
+                      </span>
+                      <span style={{
+                        fontSize: '0.58rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        color: active ? 'var(--mauve-deep)' : 'var(--text-light)',
+                        fontWeight: active ? 700 : 400,
+                        transition: 'color 0.2s, font-weight 0.2s',
+                      }}>
+                        {n.label}
+                      </span>
+                      {active && (
+                        <span style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          width: 20,
+                          height: 3,
+                          borderRadius: 2,
+                          background: 'var(--mauve-deep)',
+                          transition: 'all 0.3s',
+                        }} />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </nav>
 
-        </div>
+            {toast && <Toast msg={toast} />}
+
+            {/* ── Who are you modal ── */}
+            <Modal open={showWhoModal} onClose={() => who && setShowWhoModal(false)} title="Who's using the app? 💕">
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: 18, textAlign: 'center', lineHeight: 1.6 }}>
+                Tell us who you are so we can personalise your experience!
+              </p>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button style={styles.bigWhoBtn} onClick={() => selectWho('Kishan')}>
+                  <div style={{ fontSize: '2rem', marginBottom: 6 }}>💙</div>
+                  <strong>Kishan</strong>
+                </button>
+                <button style={styles.bigWhoBtn} onClick={() => selectWho('Aditi')}>
+                  <div style={{ fontSize: '2rem', marginBottom: 6 }}>🌸</div>
+                  <strong>Aditi</strong>
+                </button>
+              </div>
+            </Modal>
+
+          </div>
+        </RoleContext.Provider>
       </WhoContext.Provider>
     </ToastContext.Provider>
   )
@@ -300,6 +323,18 @@ const styles = {
     fontSize: '0.82rem',
     cursor: 'pointer',
     fontFamily: "Lato, sans-serif",
+    transition: 'all 0.2s',
+    WebkitTapHighlightColor: 'transparent',
+  },
+  visitorTag: {
+    background: 'rgba(255,255,255,0.12)',
+    border: '1px solid rgba(255,255,255,0.25)',
+    borderRadius: 20,
+    color: 'rgba(255,255,255,0.85)',
+    padding: '6px 14px',
+    fontSize: '0.78rem',
+    cursor: 'pointer',
+    fontFamily: 'Lato, sans-serif',
     transition: 'all 0.2s',
     WebkitTapHighlightColor: 'transparent',
   },

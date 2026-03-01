@@ -15,7 +15,8 @@ export default function LockScreen({ onUnlock }) {
   const tryUnlock = () => {
     if (val === CORRECT_VALUE) {
       sessionStorage.setItem('ka_unlocked', '1')
-      onUnlock()
+      sessionStorage.setItem('ka_role', 'owner')
+      onUnlock('owner')
     } else {
       setShake(true)
       setWrong(true)
@@ -60,6 +61,20 @@ export default function LockScreen({ onUnlock }) {
 
         <button style={s.btn} onClick={tryUnlock}>
           Enter with love 💕
+        </button>
+
+        <div style={s.divider}>
+          <span style={s.dividerLine} />
+          <span style={s.dividerText}>or</span>
+          <span style={s.dividerLine} />
+        </div>
+
+        <button style={s.visitorBtn} onClick={() => {
+          sessionStorage.setItem('ka_unlocked', '1')
+          sessionStorage.setItem('ka_role', 'visitor')
+          onUnlock('visitor')
+        }}>
+          View as Visitor 👀
         </button>
 
         <p style={s.footer}>Only the two of us know this date 🌹</p>
@@ -154,4 +169,29 @@ const s = {
     WebkitTapHighlightColor: 'transparent',
   },
   footer: { fontSize: '0.72rem', color: '#b89090', marginTop: 16 },
+  divider: {
+    display: 'flex', alignItems: 'center', gap: 12,
+    margin: '14px 0 10px',
+  },
+  dividerLine: {
+    flex: 1, height: 1,
+    background: 'linear-gradient(90deg, transparent, rgba(200,120,140,0.25), transparent)',
+  },
+  dividerText: {
+    fontSize: '0.75rem', color: '#b89090',
+    fontFamily: 'Lato, sans-serif',
+  },
+  visitorBtn: {
+    width: '100%', padding: '12px',
+    background: 'transparent',
+    color: 'var(--mauve, #9b6b7b)',
+    border: '2px solid rgba(155,107,123,0.25)',
+    borderRadius: 50,
+    fontFamily: 'Lato, sans-serif',
+    fontSize: '0.88rem',
+    cursor: 'pointer',
+    letterSpacing: '0.3px',
+    transition: 'all 0.2s',
+    WebkitTapHighlightColor: 'transparent',
+  },
 }

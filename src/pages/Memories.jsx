@@ -26,9 +26,13 @@ export default function Memories() {
     return unsub
   }, [])
 
-  const handleFile = (f) => { setFile(f); setPreview(URL.createObjectURL(f)) }
+  const handleFile = (f) => {
+    if (preview) URL.revokeObjectURL(preview)
+    setFile(f); setPreview(URL.createObjectURL(f))
+  }
 
   const resetForm = () => {
+    if (preview) URL.revokeObjectURL(preview)
     setTitle(''); setCaption(''); setDate('')
     setFile(null); setPreview(null)
   }
@@ -42,7 +46,7 @@ export default function Memories() {
       await fsAdd('memories', {
         title: title.trim(),
         caption: caption.trim(),
-        date: date || new Date().toISOString().split('T')[0],
+        date: date || new Date().toLocaleDateString('en-CA'),
         imgUrl,
         rotate: (Math.random() * 6 - 3).toFixed(2),
       })
@@ -114,7 +118,15 @@ export default function Memories() {
               </div>
             </div>
             <Button variant="danger" size="sm" style={{ marginTop: 16 }}
-              onClick={async () => { await fsDelete('memories', selected.id); setSelected(null); showToast('Deleted') }}>
+              onClick={async () => {
+                try {
+                  await fsDelete('memories', selected.id)
+                  setSelected(null)
+                  showToast('Deleted')
+                } catch {
+                  showToast('Error deleting')
+                }
+              }}>
               Delete Memory
             </Button>
           </div>

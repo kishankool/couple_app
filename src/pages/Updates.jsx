@@ -44,6 +44,7 @@ export default function Updates() {
   }, [])
 
   const resetPhotoForm = () => {
+    if (pPreview) URL.revokeObjectURL(pPreview)
     setPCaption(''); setPFile(null); setPPreview(null)
   }
 
@@ -139,11 +140,13 @@ export default function Updates() {
       </div>
 
       {/* Tab Switcher */}
-      <div className="tabs-container">
+      <div className="tabs-container" role="tablist">
         {TABS.map(tab => (
           <button
             key={tab.key}
             id={`tab-${tab.key}`}
+            role="tab"
+            aria-selected={activeTab === tab.key}
             className={`tab-button ${activeTab === tab.key ? 'active' : ''}`}
             onClick={() => setActiveTab(tab.key)}
           >
@@ -256,7 +259,7 @@ export default function Updates() {
       {/* Photo Modal */}
       <Modal open={photoOpen} onClose={() => setPhotoOpen(false)} title="🤳 Post a Photo Update">
         <WhoSelector value={pWho} onChange={setPWho} />
-        <ImageUpload onFile={f => { setPFile(f); setPPreview(URL.createObjectURL(f)) }} preview={pPreview} label="Tap to upload your selfie" />
+        <ImageUpload onFile={f => { if (pPreview) URL.revokeObjectURL(pPreview); setPFile(f); setPPreview(URL.createObjectURL(f)) }} preview={pPreview} label="Tap to upload your selfie" />
         <input value={pCaption} onChange={e => setPCaption(e.target.value)} placeholder="Caption (optional)" style={{ marginBottom: 14 }} />
         <Button size="full" onClick={savePhoto} disabled={pSaving}>
           {pSaving ? 'Uploading…' : 'Post Update 🌸'}

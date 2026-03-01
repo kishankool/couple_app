@@ -111,15 +111,10 @@ export default function More() {
 
   // Firestore listeners
   useEffect(() => {
-    let u1, u2, u3
-    try { u1 = fsListen('date_ideas', d => setIdeas(d)) } catch (e) { console.warn('date_ideas listener failed:', e) }
-    try { u2 = fsListen('events', d => setEvents(d)) } catch (e) { console.warn('events listener failed:', e) }
-    try { u3 = fsListen('moods', d => setMoods(d)) } catch (e) { console.warn('moods listener failed:', e) }
-    return () => {
-      try { u1 && u1() } catch (e) { console.warn('date_ideas unsub failed:', e) }
-      try { u2 && u2() } catch (e) { console.warn('events unsub failed:', e) }
-      try { u3 && u3() } catch (e) { console.warn('moods unsub failed:', e) }
-    }
+    const u1 = fsListen('date_ideas', d => setIdeas(d))
+    const u2 = fsListen('events', d => setEvents(d))
+    const u3 = fsListen('moods', d => setMoods(d))
+    return () => { u1(); u2(); u3() }
   }, [])
 
   // Save date idea
@@ -206,7 +201,7 @@ export default function More() {
             onClick={() => setActiveTab(tab.key)}
           >
             <span>{tab.icon}</span>
-            <span className="visually-hidden">{tab.label}</span>
+            <span className="tab-label">{tab.label}</span>
             <span className="tab-count">
               {tab.key === 'ideas' ? allIdeas.length
                 : tab.key === 'countdowns' ? events.length
@@ -239,7 +234,14 @@ export default function More() {
                       type="button"
                       style={S.delBtn}
                       aria-label={`Delete date idea: ${d.name}`}
-                      onClick={() => fsDelete('date_ideas', d.id).then(() => showToast('Removed 🌹')).catch(() => showToast('Error'))}
+                      onClick={async () => {
+                        try {
+                          await fsDelete('date_ideas', d.id)
+                          showToast('Removed 🌹')
+                        } catch {
+                          showToast('Error')
+                        }
+                      }}
                     >🗑</button>
                   )}
                 </div>

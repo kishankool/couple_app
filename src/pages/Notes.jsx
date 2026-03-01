@@ -36,11 +36,15 @@ export default function Notes() {
       setText('')
       setOpen(false)
       showToast('Love note sent! 💌')
-      notifyPartner(from, {
-        title: '💌 You received a love note!',
-        body: `Open the app to read what ${from} wrote for you 🌸`,
-        url: '/notes'
-      })
+      try {
+        await notifyPartner(from, {
+          title: '💌 You received a love note!',
+          body: `Open the app to read what ${from} wrote for you 🌸`,
+          url: '/notes'
+        })
+      } catch (pushErr) {
+        console.warn('Push notification failed:', pushErr)
+      }
     } catch { showToast('Error saving note') }
     setSaving(false)
   }

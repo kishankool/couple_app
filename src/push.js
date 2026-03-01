@@ -2,6 +2,16 @@
 // Web Push subscription helpers — works with the Vercel /api/notify endpoint
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
+const PUSH_API_KEY     = import.meta.env.VITE_PUSH_API_KEY
+
+// Only allow known owner names — prevents Firestore path injection
+const ALLOWED_USERS = new Set(['Kishan', 'Aditi'])
+
+function validateWho(who) {
+  if (typeof who !== 'string') return false
+  if (!ALLOWED_USERS.has(who)) return false
+  return true
+}
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4)
@@ -12,6 +22,10 @@ function urlBase64ToUint8Array(base64String) {
 
 // Register the service worker and subscribe to push
 export async function subscribeToPush(who) {
+  if (!validateWho(who)) {
+    console.warn('subscribeToPush: invalid who value:', who)
+    return null
+  }
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null
   if (!VAPID_PUBLIC_KEY) {
     console.warn('VITE_VAPID_PUBLIC_KEY not set — push disabled')
@@ -29,7 +43,7 @@ export async function subscribeToPush(who) {
       })
     }
 
-    // Save subscription to Firestore, keyed by user
+    // Save subscription to Firestore, keyed by the validated user name
     const { fsSet } = await import('./firebase')
     await fsSet('push_subs', who, { subscription: JSON.parse(JSON.stringify(sub)), who })
     return sub
@@ -39,8 +53,13 @@ export async function subscribeToPush(who) {
   }
 }
 
-// Send a push to the partner via the Vercel API
+// Send a push to the partner via the Vercel serverless API
 export async function notifyPartner(who, { title, body, url = '/' }) {
+  if (!validateWho(who)) {
+    console.warn('notifyPartner: invalid who value:', who)
+    return
+  }
+
   const partnerName = who === 'Kishan' ? 'Aditi' : 'Kishan'
 
   try {
@@ -51,9 +70,12 @@ export async function notifyPartner(who, { title, body, url = '/' }) {
 
     const { subscription } = snap.data()
 
+    const headers = { 'Content-Type': 'application/json' }
+    if (PUSH_API_KEY) headers['X-Push-Token'] = PUSH_API_KEY
+
     const res = await fetch('/api/notify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ subscription, title, body, url }),
     })
 

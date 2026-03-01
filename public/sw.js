@@ -51,11 +51,11 @@ self.addEventListener('push', e => {
 self.addEventListener('notificationclick', e => {
   e.notification.close()
   e.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async list => {
       const url = e.notification.data?.url || '/'
       for (const client of list) {
         if ('focus' in client) {
-          client.navigate(url)
+          await client.navigate(url)
           return client.focus()
         }
       }

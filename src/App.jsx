@@ -28,7 +28,7 @@ const NAV_ALL = [
 import { subscribeToPush } from './push'
 
 // ── Notification Manager ──
-function NotificationBell({ who }) {
+function NotificationBell({ who, showToast }) {
   const [status, setStatus] = useState(() => {
     if (!('Notification' in window)) return 'unsupported'
     return Notification.permission
@@ -41,7 +41,7 @@ function NotificationBell({ who }) {
       setStatus(perm)
       if (perm === 'granted') {
         await subscribeToPush(who)
-        showToastRef.current?.('Notifications enabled! 🌸')
+        showToast?.('Notifications enabled! 🌸')
       }
     } catch (err) {
       console.warn('Notification request failed:', err)
@@ -182,7 +182,7 @@ export default function App() {
               {/* Only show top-bar controls for owners */}
               {!isVisitor && (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <NotificationBell who={who} />
+                  <NotificationBell who={who} showToast={showToast} />
                   <button style={styles.whoTag} onClick={() => setShowWhoModal(true)}>
                     {who === 'Kishan' ? '💙' : '🌸'} {who}
                   </button>

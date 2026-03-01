@@ -175,6 +175,27 @@ textarea { resize: vertical; min-height: 80px; }
   100% { background-position: 200% 0; }
 }
 
+/* ── Memory Journey transitions ── */
+.journey-fade-in {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+.journey-fade-out {
+  opacity: 0;
+  transform: scale(0.96) translateY(8px);
+}
+.journey-bg.journey-fade-in {
+  opacity: 1;
+}
+.journey-bg.journey-fade-out {
+  opacity: 0;
+}
+.memory-journey {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* Tab styles */
 .tabs-container {
   display: flex;

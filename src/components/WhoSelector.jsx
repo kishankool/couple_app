@@ -16,7 +16,7 @@ export default function WhoSelector({ value, onChange }) {
             background: value === name ? 'var(--blush)' : 'white',
             color: value === name ? 'var(--mauve-deep)' : 'var(--text)',
             fontWeight: value === name ? 700 : 400,
-            fontFamily: "'Lato', sans-serif",
+            fontFamily: "Lato, sans-serif",
             fontSize: '0.9rem',
             cursor: 'pointer',
             transition: 'all 0.2s',

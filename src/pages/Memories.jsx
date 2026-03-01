@@ -21,11 +21,21 @@ export default function Memories() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
+    // Listen with no limit restriction — shows ALL memories
     const unsub = fsListen('memories', data => { setMemories(data); setLoading(false) })
     return unsub
   }, [])
 
-  const handleFile = (f) => { setFile(f); setPreview(URL.createObjectURL(f)) }
+  const handleFile = (f) => {
+    if (preview) URL.revokeObjectURL(preview)
+    setFile(f); setPreview(URL.createObjectURL(f))
+  }
+
+  const resetForm = () => {
+    if (preview) URL.revokeObjectURL(preview)
+    setTitle(''); setCaption(''); setDate('')
+    setFile(null); setPreview(null)
+  }
 
   const save = async () => {
     if (!title.trim()) return showToast('Add a title 🌸')
@@ -36,11 +46,11 @@ export default function Memories() {
       await fsAdd('memories', {
         title: title.trim(),
         caption: caption.trim(),
-        date: date || new Date().toISOString().split('T')[0],
+        date: date || new Date().toLocaleDateString('en-CA'),
         imgUrl,
-        rotate: (Math.random() * 6 - 3).toFixed(2),   // random tilt for polaroid feel
+        rotate: (Math.random() * 6 - 3).toFixed(2),
       })
-      setTitle(''); setCaption(''); setDate(''); setFile(null); setPreview(null)
+      resetForm()
       setOpen(false)
       showToast('Memory saved! 📸')
     } catch (e) {
@@ -51,21 +61,19 @@ export default function Memories() {
   }
 
   const del = async (m, e) => {
-    e.stopPropagation()
+    if (e) e.stopPropagation()
     try { await fsDelete('memories', m.id); showToast('Memory deleted') }
     catch { showToast('Error deleting') }
   }
 
   return (
-    <div style={{ padding: '18px 16px' }}>
-
-
+    <div className="page-content">
       <div style={styles.header}>
         <div>
           <div style={styles.pageTitle}>📸 Memories</div>
-          <div style={styles.pageSub}>Our polaroid wall</div>
+          <div style={styles.pageSub}>Our polaroid wall · {memories.length} {memories.length === 1 ? 'memory' : 'memories'}</div>
         </div>
-        <Button size="sm" onClick={() => setOpen(true)}>+ Add</Button>
+        <Button size="sm" onClick={() => { resetForm(); setOpen(true) }}>+ Add</Button>
       </div>
 
       {loading ? (
@@ -86,9 +94,9 @@ export default function Memories() {
       {/* Add Memory Modal */}
       <Modal open={open} onClose={() => setOpen(false)} title="📸 Add a Memory">
         <ImageUpload onFile={handleFile} preview={preview} label="Tap to upload your photo" />
-        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Memory title (e.g. First date 💕)" style={{ marginBottom: 8 }} />
-        <input value={caption} onChange={e => setCaption(e.target.value)} placeholder="Caption / note (optional)" style={{ marginBottom: 8 }} />
-        <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ marginBottom: 14 }} />
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Memory title (e.g. First date 💕)" style={{ marginBottom: 10 }} />
+        <input value={caption} onChange={e => setCaption(e.target.value)} placeholder="Caption / note (optional)" style={{ marginBottom: 10 }} />
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ marginBottom: 16 }} />
         <Button size="full" onClick={save} disabled={saving}>
           {saving ? 'Developing your polaroid… 📸' : 'Save Memory 🌸'}
         </Button>
@@ -110,7 +118,15 @@ export default function Memories() {
               </div>
             </div>
             <Button variant="danger" size="sm" style={{ marginTop: 16 }}
-              onClick={async () => { await fsDelete('memories', selected.id); setSelected(null); showToast('Deleted') }}>
+              onClick={async () => {
+                try {
+                  await fsDelete('memories', selected.id)
+                  setSelected(null)
+                  showToast('Deleted')
+                } catch {
+                  showToast('Error deleting')
+                }
+              }}>
               Delete Memory
             </Button>
           </div>
@@ -132,11 +148,11 @@ function PolaroidCard({ memory: m, index, onClick, onDelete }) {
         ...styles.polaroid,
         transform: `rotate(${rotate}deg)`,
         background: tint,
-        animationDelay: `${index * 0.07}s`,
+        animationDelay: `${Math.min(index * 0.06, 0.6)}s`,
       }}
     >
       {m.imgUrl
-        ? <img src={m.imgUrl} alt={m.title} style={styles.polaroidImg} />
+        ? <img src={m.imgUrl} alt={m.title} style={styles.polaroidImg} loading="lazy" />
         : <div style={styles.polaroidPlaceholder}>📸</div>
       }
       <div style={styles.polaroidBottom}>
@@ -161,13 +177,14 @@ function formatDate(d) {
 
 const styles = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  pageTitle: { fontFamily: "'Playfair Display', serif", fontSize: '1.05rem', color: 'var(--mauve-deep)' },
+  pageTitle: { fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', color: 'var(--mauve-deep)' },
   pageSub: { fontSize: '0.75rem', color: 'var(--text-light)', marginTop: 2 },
 
-  // Polaroid wall — masonry-ish two-column
+  // Polaroid wall — responsive masonry
   wall: {
     columns: 2,
     columnGap: 12,
+    columnFill: 'balance',
   },
 
   polaroid: {
@@ -175,14 +192,15 @@ const styles = {
     display: 'inline-block',
     width: '100%',
     background: '#fffdf5',
-    padding: '8px 8px 16px',
-    boxShadow: '0 6px 20px rgba(100,60,80,0.18), 0 2px 6px rgba(0,0,0,0.08)',
-    borderRadius: 2,
-    marginBottom: 14,
+    padding: '7px 7px 14px',
+    boxShadow: '0 4px 16px rgba(100,60,80,0.15), 0 1px 4px rgba(0,0,0,0.06)',
+    borderRadius: 3,
+    marginBottom: 12,
     cursor: 'pointer',
     position: 'relative',
-    transition: 'transform 0.2s, box-shadow 0.2s',
+    transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s',
     animation: 'fadeUp 0.4s ease both',
+    WebkitTapHighlightColor: 'transparent',
   },
 
   polaroidImg: {
@@ -190,27 +208,27 @@ const styles = {
     aspectRatio: '1',
     objectFit: 'cover',
     display: 'block',
-    borderRadius: 1,
-    filter: 'contrast(1.04) saturate(0.95)',  // slight faded film look
+    borderRadius: 2,
+    filter: 'contrast(1.04) saturate(0.95)',
   },
 
   polaroidPlaceholder: {
     width: '100%', aspectRatio: '1',
     background: 'linear-gradient(135deg, #f5e8ee, #ede0e8)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '2.5rem', borderRadius: 1,
+    fontSize: '2.2rem', borderRadius: 2,
   },
 
   polaroidBottom: {
-    paddingTop: 8,
+    paddingTop: 7,
     paddingBottom: 2,
     textAlign: 'center',
-    minHeight: 44,
+    minHeight: 40,
   },
 
   polaroidTitle: {
     fontFamily: "'Caveat', cursive",
-    fontSize: '1rem',
+    fontSize: '0.95rem',
     fontWeight: 600,
     color: '#4a3040',
     lineHeight: 1.3,
@@ -218,7 +236,7 @@ const styles = {
 
   polaroidCaption: {
     fontFamily: "'Reenie Beanie', cursive",
-    fontSize: '0.95rem',
+    fontSize: '0.9rem',
     color: '#9b6b7b',
     marginTop: 2,
     lineHeight: 1.3,
@@ -226,7 +244,7 @@ const styles = {
 
   polaroidDate: {
     fontFamily: "'Caveat', cursive",
-    fontSize: '0.78rem',
+    fontSize: '0.72rem',
     color: '#b89090',
     marginTop: 3,
   },
@@ -235,10 +253,12 @@ const styles = {
     position: 'absolute', top: 4, right: 4,
     background: 'rgba(0,0,0,0.35)', color: 'white',
     border: 'none', borderRadius: '50%',
-    width: 22, height: 22, fontSize: '0.6rem',
+    width: 24, height: 24, fontSize: '0.6rem',
     cursor: 'pointer', display: 'flex',
     alignItems: 'center', justifyContent: 'center',
-    opacity: 0.7,
+    opacity: 0.6,
+    transition: 'opacity 0.2s',
+    WebkitTapHighlightColor: 'transparent',
   },
 
   // Large polaroid in modal
@@ -246,34 +266,35 @@ const styles = {
     background: '#fffdf5',
     padding: '12px 12px 24px',
     boxShadow: '0 8px 30px rgba(100,60,80,0.2)',
-    borderRadius: 2,
+    borderRadius: 3,
     display: 'inline-block',
-    maxWidth: 300,
+    maxWidth: '100%',
+    width: '100%',
   },
   polaroidImgLarge: {
     width: '100%',
-    maxHeight: 260,
+    maxHeight: 320,
     objectFit: 'cover',
-    borderRadius: 1,
+    borderRadius: 2,
     filter: 'contrast(1.04) saturate(0.95)',
   },
   polaroidPlaceholderLarge: {
-    width: 260, height: 220,
+    width: '100%', height: 220,
     background: '#f5e8ee',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: '4rem',
   },
-  polaroidBottomLarge: { paddingTop: 12, textAlign: 'center' },
+  polaroidBottomLarge: { paddingTop: 14, textAlign: 'center' },
   polaroidTitleLarge: {
     fontFamily: "'Caveat', cursive",
-    fontSize: '1.3rem', fontWeight: 600, color: '#4a3040',
+    fontSize: '1.4rem', fontWeight: 600, color: '#4a3040',
   },
   polaroidCaptionLarge: {
     fontFamily: "'Reenie Beanie', cursive",
-    fontSize: '1.15rem', color: '#9b6b7b', marginTop: 4,
+    fontSize: '1.2rem', color: '#9b6b7b', marginTop: 4,
   },
   polaroidDateLarge: {
     fontFamily: "'Caveat', cursive",
-    fontSize: '0.9rem', color: '#b89090', marginTop: 5,
+    fontSize: '0.95rem', color: '#b89090', marginTop: 5,
   },
 }

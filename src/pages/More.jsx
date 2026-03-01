@@ -24,6 +24,13 @@ const TAG_COLORS = {
   foodie: { bg: '#fce4ec', color: '#880e4f' },
 }
 
+const MORE_TABS = [
+  { key: 'ideas', icon: '🌹', label: 'Date Ideas' },
+  { key: 'countdowns', icon: '🎉', label: 'Countdowns' },
+  { key: 'stats', icon: '📊', label: 'Stats' },
+  { key: 'moods', icon: '🌙', label: 'Moods' },
+]
+
 function liveCountdown(dateStr) {
   const diff = new Date(dateStr) - Date.now()
   if (diff < 0) return { text: 'Already happened 💫', past: true }
@@ -66,20 +73,20 @@ function RelStats() {
   ]
 
   return (
-    <Card>
-      <CardTitle icon="📊">Relationship Stats</CardTitle>
-      {rows.map(([lbl, val]) => (
-        <div key={lbl} style={S.statRow}>
+    <div>
+      {rows.map(([lbl, val], i) => (
+        <div key={lbl} style={{ ...S.statRow, animationDelay: `${i * 0.05}s` }}>
           <span style={S.statLbl}>{lbl}</span>
           <span style={S.statVal}>{val}</span>
         </div>
       ))}
-    </Card>
+    </div>
   )
 }
 
 export default function More() {
   const showToast = useContext(ToastContext)
+  const [activeTab, setActiveTab] = useState('ideas')
 
   const [ideas, setIdeas] = useState([])
   const [events, setEvents] = useState([])
@@ -96,28 +103,21 @@ export default function More() {
   const [iTag, setITag] = useState('romantic')
   const [iSaving, setISaving] = useState(false)
 
-  // Event / countdown form — now uses native date + time pickers
+  // Event / countdown form
   const [eName, setEName] = useState('')
-  const [eDate, setEDate] = useState('')      // "2026-04-21"
-  const [eTime, setETime] = useState('12:00') // "14:30"
+  const [eDate, setEDate] = useState('')
+  const [eTime, setETime] = useState('12:00')
   const [eSaving, setESaving] = useState(false)
 
-  // ── Firestore listeners ───────────────────────────────────────────────────
-  // NOTE: we use try/catch wrappers around listeners to avoid crashes if
-  // Firestore index isn't ready yet. Events are sorted client-side.
+  // Firestore listeners
   useEffect(() => {
-    let u1, u2, u3
-    try { u1 = fsListen('date_ideas', d => setIdeas(d)) } catch { }
-    try { u2 = fsListen('events', d => setEvents(d)) } catch { }
-    try { u3 = fsListen('moods', d => setMoods(d)) } catch { }
-    return () => {
-      try { u1 && u1() } catch { }
-      try { u2 && u2() } catch { }
-      try { u3 && u3() } catch { }
-    }
+    const u1 = fsListen('date_ideas', d => setIdeas(d))
+    const u2 = fsListen('events', d => setEvents(d))
+    const u3 = fsListen('moods', d => setMoods(d))
+    return () => { u1(); u2(); u3() }
   }, [])
 
-  // ── Save date idea ────────────────────────────────────────────────────────
+  // Save date idea
   const saveIdea = async () => {
     if (!iName.trim()) return showToast('Enter a date idea name 🌹')
     setISaving(true)
@@ -138,7 +138,7 @@ export default function More() {
     setISaving(false)
   }
 
-  // ── Save countdown event ──────────────────────────────────────────────────
+  // Save countdown event
   const saveEvent = async () => {
     if (!eName.trim()) return showToast('Enter an event name 🎉')
     if (!eDate) return showToast('Pick a date 📅')
@@ -157,7 +157,7 @@ export default function More() {
     setESaving(false)
   }
 
-  // Sort events client-side: soonest upcoming first, past at bottom
+  // Sort events
   const sortedEvents = [...events].sort((a, b) => {
     const da = new Date(a.date) - Date.now()
     const db = new Date(b.date) - Date.now()
@@ -174,110 +174,165 @@ export default function More() {
     })
     : null
 
+  const getAddButton = () => {
+    if (activeTab === 'ideas') return <Button size="sm" onClick={() => setIdeaOpen(true)}>+ Idea</Button>
+    if (activeTab === 'countdowns') return <Button size="sm" onClick={() => setEventOpen(true)}>+ Event</Button>
+    return null
+  }
+
   return (
-    <div style={{ padding: '18px 16px' }}>
-
-      {/* ── Date Ideas ────────────────────────────────── */}
-      <Card>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <CardTitle icon="🌹">Date Ideas</CardTitle>
-          <Button size="sm" onClick={() => setIdeaOpen(true)}>+ Add idea</Button>
+    <div className="page-content">
+      {/* Header */}
+      <div style={styles.header}>
+        <div>
+          <div style={styles.pageTitle}>🌹 More</div>
+          <div style={styles.pageSub}>Ideas, countdowns & stats</div>
         </div>
+        {getAddButton()}
+      </div>
 
-        {allIdeas.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-light)', fontSize: '0.85rem' }}>
-            No ideas yet!
-          </div>
-        ) : allIdeas.map((d, i) => {
-          const tc = TAG_COLORS[d.tag] || TAG_COLORS.romantic
-          return (
-            <div key={i} style={S.ideaRow}>
-              <span style={S.ideaIcon}>{d.icon}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={S.ideaName}>{d.name}</div>
-                {d.desc && <div style={S.ideaDesc}>{d.desc}</div>}
-              </div>
-              <span style={{ ...S.tag, background: tc.bg, color: tc.color }}>{d.tag}</span>
-              {!d.isDefault && d.id && (
-                <button
-                  style={S.delBtn}
-                  onClick={() => fsDelete('date_ideas', d.id).then(() => showToast('Removed 🌹')).catch(() => showToast('Error'))}
-                >🗑</button>
-              )}
-            </div>
-          )
-        })}
-      </Card>
-
-      {/* ── Countdowns ────────────────────────────────── */}
-      <Card>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <CardTitle icon="🎉">Countdowns</CardTitle>
-          <Button size="sm" onClick={() => setEventOpen(true)}>+ Add event</Button>
-        </div>
-
-        {sortedEvents.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-light)', fontSize: '0.85rem' }}>
-            No countdowns yet! Add your next special event 🎉
-          </div>
-        ) : sortedEvents.map(e => {
-          const cd = liveCountdown(e.date)
-          return (
-            <div key={e.id} style={{ ...S.eventCard, opacity: cd.past ? 0.55 : 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <div style={S.eventName}>{e.name}</div>
-                <button
-                  style={S.delBtn}
-                  onClick={() => fsDelete('events', e.id).then(() => showToast('Removed')).catch(() => showToast('Error'))}
-                >🗑</button>
-              </div>
-              <div style={{ ...S.eventCountdown, color: cd.past ? 'var(--text-light)' : 'var(--rose-dark)' }}>
-                {cd.past ? cd.text : `In ${cd.text} ⏳`}
-              </div>
-              <div style={S.eventDate}>
-                {new Date(e.date).toLocaleString('en-IN', {
-                  day: 'numeric', month: 'long', year: 'numeric',
-                  hour: '2-digit', minute: '2-digit',
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </Card>
-
-      {/* ── Relationship Stats ─────────────────────────── */}
-      <RelStats />
-
-      {/* ── Mood History ──────────────────────────────── */}
-      <Card>
-        <CardTitle icon="🌙">Mood History</CardTitle>
-        {moods.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 10, color: 'var(--text-light)', fontSize: '0.85rem' }}>
-            No moods logged yet!
-          </div>
-        ) : moods.slice(0, 30).map((m, i) => (
-          <div key={i} style={S.moodRow}>
-            <span style={{ fontSize: '1.4rem' }}>{m.emoji}</span>
-            <div>
-              <div style={S.moodWho}>{m.who}</div>
-              <div style={S.moodWhen}>
-                {m.date
-                  ? new Date(m.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                  : ''}
-              </div>
-            </div>
-          </div>
+      {/* Tab Switcher */}
+      <div className="tabs-container">
+        {MORE_TABS.map(tab => (
+          <button
+            key={tab.key}
+            id={`more-tab-${tab.key}`}
+            className={`tab-button ${activeTab === tab.key ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            <span>{tab.icon}</span>
+            <span className="tab-label">{tab.label}</span>
+            <span className="tab-count">
+              {tab.key === 'ideas' ? allIdeas.length
+                : tab.key === 'countdowns' ? events.length
+                  : tab.key === 'moods' ? moods.length
+                    : '∞'}
+            </span>
+          </button>
         ))}
-      </Card>
+      </div>
 
-      {/* ── Add Date Idea Modal ────────────────────────── */}
+      {/* ── Date Ideas Tab ── */}
+      {activeTab === 'ideas' && (
+        <div style={{ animation: 'fadeUp 0.25s ease' }}>
+          <Card>
+            <CardTitle icon="🌹">Date Ideas</CardTitle>
+            {allIdeas.length === 0 ? (
+              <div className="empty-state" style={{ padding: 16 }}>No ideas yet!</div>
+            ) : allIdeas.map((d, i) => {
+              const tc = TAG_COLORS[d.tag] || TAG_COLORS.romantic
+              return (
+                <div key={`idea-${i}`} style={{ ...S.ideaRow, animationDelay: `${Math.min(i * 0.04, 0.4)}s` }}>
+                  <span style={S.ideaIcon}>{d.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={S.ideaName}>{d.name}</div>
+                    {d.desc && <div style={S.ideaDesc}>{d.desc}</div>}
+                  </div>
+                  <span style={{ ...S.tag, background: tc.bg, color: tc.color }}>{d.tag}</span>
+                  {!d.isDefault && d.id && (
+                    <button
+                      type="button"
+                      style={S.delBtn}
+                      aria-label={`Delete date idea: ${d.name}`}
+                      onClick={async () => {
+                        try {
+                          await fsDelete('date_ideas', d.id)
+                          showToast('Removed 🌹')
+                        } catch {
+                          showToast('Error')
+                        }
+                      }}
+                    >🗑</button>
+                  )}
+                </div>
+              )
+            })}
+          </Card>
+        </div>
+      )}
+
+      {/* ── Countdowns Tab ── */}
+      {activeTab === 'countdowns' && (
+        <div style={{ animation: 'fadeUp 0.25s ease' }}>
+          <Card>
+            <CardTitle icon="🎉">Countdowns</CardTitle>
+            {sortedEvents.length === 0 ? (
+              <div className="empty-state" style={{ padding: 16 }}>
+                No countdowns yet! Add your next special event 🎉
+              </div>
+            ) : sortedEvents.map((e, i) => {
+              const cd = liveCountdown(e.date)
+              return (
+                <div key={e.id} style={{ ...S.eventCard, opacity: cd.past ? 0.55 : 1, animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={S.eventName}>{e.name}</div>
+                    <button
+                      type="button"
+                      style={S.delBtn}
+                      aria-label={`Delete countdown: ${e.name}`}
+                      onClick={() => fsDelete('events', e.id).then(() => showToast('Removed')).catch(() => showToast('Error'))}
+                    >🗑</button>
+                  </div>
+                  <div style={{ ...S.eventCountdown, color: cd.past ? 'var(--text-light)' : 'var(--rose-dark)' }}>
+                    {cd.past ? cd.text : `In ${cd.text} ⏳`}
+                  </div>
+                  <div style={S.eventDate}>
+                    {new Date(e.date).toLocaleString('en-IN', {
+                      day: 'numeric', month: 'long', year: 'numeric',
+                      hour: '2-digit', minute: '2-digit',
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </Card>
+        </div>
+      )}
+
+      {/* ── Stats Tab ── */}
+      {activeTab === 'stats' && (
+        <div style={{ animation: 'fadeUp 0.25s ease' }}>
+          <Card>
+            <CardTitle icon="📊">Relationship Stats</CardTitle>
+            <RelStats />
+          </Card>
+        </div>
+      )}
+
+      {/* ── Moods Tab ── */}
+      {activeTab === 'moods' && (
+        <div style={{ animation: 'fadeUp 0.25s ease' }}>
+          <Card>
+            <CardTitle icon="🌙">Mood History</CardTitle>
+            {moods.length === 0 ? (
+              <div className="empty-state" style={{ padding: 16 }}>No moods logged yet!</div>
+            ) : moods.map((m, i) => (
+              <div key={`mood-${i}`} style={{ ...S.moodRow, animationDelay: `${Math.min(i * 0.03, 0.5)}s` }}>
+                <span style={{ fontSize: '1.5rem' }}>{m.emoji}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={S.moodWho}>
+                    {m.who === 'Kishan' ? '💙' : '🌸'} {m.who}
+                  </div>
+                  <div style={S.moodWhen}>
+                    {m.date
+                      ? new Date(m.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                      : ''}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </Card>
+        </div>
+      )}
+
+      {/* ── Add Date Idea Modal ── */}
       <Modal open={ideaOpen} onClose={() => setIdeaOpen(false)} title="🌹 Add a Date Idea">
         <div className="section-label">What's the idea?</div>
         <input
           value={iName}
           onChange={e => setIName(e.target.value)}
           placeholder="e.g. Rooftop stargazing 🌟"
-          style={{ marginBottom: 10 }}
+          style={{ marginBottom: 12 }}
         />
 
         <div className="section-label">Short description (optional)</div>
@@ -285,10 +340,10 @@ export default function More() {
           value={iDesc}
           onChange={e => setIDesc(e.target.value)}
           placeholder="e.g. Lie on a blanket and count stars"
-          style={{ marginBottom: 10 }}
+          style={{ marginBottom: 12 }}
         />
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
           <div style={{ flex: 1 }}>
             <div className="section-label">Emoji</div>
             <input
@@ -315,7 +370,7 @@ export default function More() {
         </Button>
       </Modal>
 
-      {/* ── Add Countdown Modal ────────────────────────── */}
+      {/* ── Add Countdown Modal ── */}
       <Modal open={eventOpen} onClose={() => setEventOpen(false)} title="🎉 Add a Countdown">
         <div className="section-label">Event name</div>
         <input
@@ -330,8 +385,8 @@ export default function More() {
           type="date"
           value={eDate}
           onChange={e => setEDate(e.target.value)}
-          min={new Date().toISOString().split('T')[0]}
-          style={{ marginBottom: 10 }}
+          min={new Date().toLocaleDateString('en-CA')}
+          style={{ marginBottom: 12 }}
         />
 
         <div className="section-label">Time (optional)</div>
@@ -344,9 +399,9 @@ export default function More() {
 
         {eventPreview && (
           <div style={{
-            background: 'var(--petal)', borderRadius: 10,
-            padding: '10px 14px', marginBottom: 14,
-            fontSize: '0.82rem', color: 'var(--mauve)', textAlign: 'center',
+            background: 'var(--petal)', borderRadius: 12,
+            padding: '12px 16px', marginBottom: 14,
+            fontSize: '0.84rem', color: 'var(--mauve)', textAlign: 'center',
           }}>
             📅 {eventPreview}
           </div>
@@ -361,50 +416,63 @@ export default function More() {
   )
 }
 
+const styles = {
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  pageTitle: { fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', color: 'var(--mauve-deep)' },
+  pageSub: { fontSize: '0.75rem', color: 'var(--text-light)', marginTop: 2 },
+}
+
 const S = {
   ideaRow: {
     display: 'flex', alignItems: 'center', gap: 10,
-    padding: '11px 0', borderBottom: '1px solid var(--border)',
+    padding: '12px 0', borderBottom: '1px solid var(--border)',
+    animation: 'fadeUp 0.3s ease both',
   },
   ideaIcon: { fontSize: '1.5rem', flexShrink: 0, width: 32, textAlign: 'center' },
-  ideaName: { fontSize: '0.88rem', fontWeight: 700, color: 'var(--text)', lineHeight: 1.3 },
-  ideaDesc: { fontSize: '0.74rem', color: 'var(--text-light)', marginTop: 2 },
+  ideaName: { fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', lineHeight: 1.3 },
+  ideaDesc: { fontSize: '0.76rem', color: 'var(--text-light)', marginTop: 2 },
   tag: {
-    borderRadius: 20, padding: '3px 9px',
+    borderRadius: 20, padding: '3px 10px',
     fontSize: '0.65rem', fontWeight: 700, flexShrink: 0,
   },
   delBtn: {
     background: 'none', border: 'none',
     color: '#ccc', cursor: 'pointer', fontSize: '0.95rem', flexShrink: 0,
+    transition: 'color 0.2s',
+    WebkitTapHighlightColor: 'transparent',
   },
   eventCard: {
     background: 'linear-gradient(135deg, #ffffff, var(--petal))',
-    borderRadius: 14, padding: '14px 14px 12px', marginBottom: 10,
-    boxShadow: '0 3px 10px var(--shadow)', border: '1px solid var(--border)',
+    borderRadius: 16, padding: '16px 16px 14px', marginBottom: 10,
+    boxShadow: '0 3px 12px var(--shadow)', border: '1px solid var(--border)',
+    animation: 'fadeUp 0.3s ease both',
+    transition: 'transform 0.2s',
   },
   eventName: {
     fontFamily: "'Playfair Display', serif",
-    fontSize: '0.95rem', color: 'var(--mauve-deep)', flex: 1, lineHeight: 1.3,
+    fontSize: '0.98rem', color: 'var(--mauve-deep)', flex: 1, lineHeight: 1.3,
   },
   eventCountdown: {
-    fontSize: '1.4rem', fontWeight: 700,
+    fontSize: '1.5rem', fontWeight: 700,
     fontFamily: "'Playfair Display', serif",
-    margin: '8px 0 4px',
+    margin: '10px 0 6px',
   },
-  eventDate: { fontSize: '0.72rem', color: 'var(--text-light)' },
+  eventDate: { fontSize: '0.74rem', color: 'var(--text-light)' },
   statRow: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '9px 0', borderBottom: '1px solid var(--border)',
+    padding: '10px 0', borderBottom: '1px solid var(--border)',
+    animation: 'fadeUp 0.3s ease both',
   },
-  statLbl: { fontSize: '0.84rem', color: 'var(--text-light)' },
+  statLbl: { fontSize: '0.86rem', color: 'var(--text-light)' },
   statVal: {
     fontFamily: "'Playfair Display', serif",
-    fontSize: '0.95rem', color: 'var(--mauve-deep)', fontWeight: 700,
+    fontSize: '0.98rem', color: 'var(--mauve-deep)', fontWeight: 700,
   },
   moodRow: {
     display: 'flex', alignItems: 'center', gap: 12,
-    padding: '8px 0', borderBottom: '1px solid var(--border)',
+    padding: '10px 0', borderBottom: '1px solid var(--border)',
+    animation: 'fadeUp 0.3s ease both',
   },
-  moodWho: { fontWeight: 700, fontSize: '0.85rem', color: 'var(--mauve-deep)' },
-  moodWhen: { fontSize: '0.72rem', color: 'var(--text-light)' },
+  moodWho: { fontWeight: 700, fontSize: '0.88rem', color: 'var(--mauve-deep)' },
+  moodWhen: { fontSize: '0.74rem', color: 'var(--text-light)', marginTop: 2 },
 }

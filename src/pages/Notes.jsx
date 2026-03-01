@@ -47,13 +47,13 @@ export default function Notes() {
   }
 
   return (
-    <div style={{ padding: '18px 16px' }}>
+    <div className="page-content">
       <div style={styles.header}>
         <div>
           <div style={styles.pageTitle}>💌 Love Notes</div>
-          <div style={styles.pageSub}>Sweet messages for each other</div>
+          <div style={styles.pageSub}>Sweet messages · {notes.length} {notes.length === 1 ? 'note' : 'notes'}</div>
         </div>
-        <Button size="sm" onClick={() => { setFrom(who); setOpen(true) }}>+ Write</Button>
+        <Button size="sm" onClick={() => { setFrom(who); setText(''); setOpen(true) }}>+ Write</Button>
       </div>
 
       {loading ? <div className="loading">🌸</div> : notes.length === 0 ? (
@@ -61,14 +61,14 @@ export default function Notes() {
           <div className="empty-icon">💌</div>
           <p>No love notes yet.<br />Write the first one!</p>
         </div>
-      ) : notes.map((n) => (
-        <div key={n.id} style={styles.noteCard}>
+      ) : notes.map((n, i) => (
+        <div key={n.id} style={{ ...styles.noteCard, animationDelay: `${Math.min(i * 0.05, 0.4)}s` }}>
           <div style={styles.noteHeader}>
             <span style={styles.authorTag}>{n.who === 'Kishan' ? '💙' : '🌸'} {n.who}</span>
             <span style={styles.noteDate}>{n.date}</span>
           </div>
           <div style={styles.noteText}>{n.text}</div>
-          <button style={styles.delBtn} onClick={() => del(n.id)}>🗑</button>
+          <button style={styles.delBtn} onClick={() => del(n.id)} title="Delete">🗑</button>
         </div>
       ))}
 
@@ -76,7 +76,7 @@ export default function Notes() {
         <div className="section-label">From</div>
         <WhoSelector value={from} onChange={setFrom} />
         <div className="section-label">Your message</div>
-        <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Write something sweet… 🌸" style={{ marginBottom: 12 }} />
+        <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Write something sweet… 🌸" style={{ marginBottom: 14 }} />
         <Button size="full" onClick={save} disabled={saving}>
           {saving ? 'Sending…' : 'Send Note 💕'}
         </Button>
@@ -87,38 +87,40 @@ export default function Notes() {
 
 const styles = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  pageTitle: { fontFamily: "'Playfair Display', serif", fontSize: '1.05rem', color: 'var(--mauve-deep)' },
+  pageTitle: { fontFamily: "'Playfair Display', serif", fontSize: '1.1rem', color: 'var(--mauve-deep)' },
   pageSub: { fontSize: '0.75rem', color: 'var(--text-light)', marginTop: 2 },
   noteCard: {
     background: 'white',
-    borderRadius: 14,
-    padding: '14px 16px',
+    borderRadius: 16,
+    padding: '16px 18px',
     marginBottom: 10,
     borderLeft: '4px solid var(--rose-dark)',
-    boxShadow: '0 3px 12px var(--shadow)',
+    boxShadow: '0 3px 14px var(--shadow)',
     position: 'relative',
-    animation: 'fadeUp 0.3s ease',
+    animation: 'fadeUp 0.35s ease both',
+    transition: 'transform 0.2s',
   },
-  noteHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  noteHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   authorTag: {
     background: 'var(--blush)',
     color: 'var(--mauve-deep)',
     borderRadius: 20,
-    padding: '2px 10px',
-    fontSize: '0.7rem',
+    padding: '3px 12px',
+    fontSize: '0.72rem',
     fontWeight: 700,
   },
-  noteDate: { fontSize: '0.68rem', color: 'var(--text-light)' },
-  noteText: { fontSize: '0.92rem', lineHeight: 1.65, color: 'var(--text)', paddingRight: 24 },
+  noteDate: { fontSize: '0.7rem', color: 'var(--text-light)' },
+  noteText: { fontSize: '0.94rem', lineHeight: 1.7, color: 'var(--text)', paddingRight: 28 },
   delBtn: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 14,
+    right: 14,
     background: 'none',
     border: 'none',
     color: '#ccc',
     cursor: 'pointer',
     fontSize: '1rem',
     transition: 'color 0.2s',
+    WebkitTapHighlightColor: 'transparent',
   },
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import Home from './pages/Home'
@@ -24,53 +24,94 @@ const NAV = [
   { path: '/more', icon: '🌹', label: 'More' },
 ]
 
-// Bell button — requests notification permission
+// ── Notification Manager ──
+// Handles both permission requests AND in-app notifications
+// when new content is added by the partner
 function NotificationBell() {
   const [status, setStatus] = useState('default')
 
   useEffect(() => {
-    if ('Notification' in window) setStatus(Notification.permission)
+    if ('Notification' in window) {
+      setStatus(Notification.permission)
+    }
   }, [])
 
   const request = async () => {
-    if (!('Notification' in window)) return
-    const perm = await Notification.requestPermission()
-    setStatus(perm)
-    if (perm === 'granted') {
-      new Notification('Kishan & Aditi 💕', {
-        body: 'Notifications enabled! You\'ll get love reminders 🌸',
-        icon: '/heart.svg',
-      })
+    if (!('Notification' in window)) {
+      // Fallback for browsers that don't support Notification API (some iOS WebViews)
+      setStatus('denied')
+      return
+    }
+
+    try {
+      const perm = await Notification.requestPermission()
+      setStatus(perm)
+      if (perm === 'granted') {
+        // Show a welcome notification to confirm it works
+        new Notification('Kishan & Aditi 💕', {
+          body: "Notifications enabled! You'll get love reminders 🌸",
+          icon: '/heart.svg',
+          tag: 'welcome',
+        })
+      }
+    } catch (err) {
+      console.warn('Notification request failed:', err)
+      setStatus('denied')
     }
   }
 
-  if (!('Notification' in window)) return null
-
   return (
     <button
+      id="notification-bell"
       onClick={status !== 'granted' ? request : undefined}
-      title={status === 'granted' ? 'Notifications on' : 'Enable notifications'}
+      title={status === 'granted' ? 'Notifications on' : status === 'denied' ? 'Notifications blocked — enable in settings' : 'Enable notifications'}
       style={{
         background: 'rgba(255,255,255,0.15)',
         border: '1px solid rgba(255,255,255,0.3)',
-        borderRadius: 20, color: 'white',
-        padding: '5px 10px', fontSize: '1rem',
+        borderRadius: 20,
+        color: 'white',
+        padding: '6px 12px',
+        fontSize: '1rem',
         cursor: status === 'granted' ? 'default' : 'pointer',
-        fontFamily: "'Lato', sans-serif",
+        fontFamily: "Lato, sans-serif",
+        position: 'relative',
+        transition: 'all 0.2s',
+        WebkitTapHighlightColor: 'transparent',
       }}
     >
-      {status === 'granted' ? '🔔' : '🔕'}
+      {status === 'granted' ? '🔔' : status === 'denied' ? '🚫' : '🔕'}
+      {status === 'denied' && (
+        <span style={{
+          display: 'block',
+          fontSize: '0.55rem',
+          opacity: 0.8,
+          marginTop: 1,
+          lineHeight: 1,
+        }}>
+          Blocked
+        </span>
+      )}
+
     </button>
   )
+}
+
+// Smooth page transitions
+const pageVariants = {
+  initial: { opacity: 0, y: 12, scale: 0.995 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  exit: { opacity: 0, y: -8, scale: 0.995 },
 }
 
 function PageWrapper({ children }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -15 }}
-      transition={{ duration: 0.25, ease: 'easeOut' }}
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+      style={{ minHeight: '100%' }}
     >
       {children}
     </motion.div>
@@ -85,11 +126,13 @@ export default function App() {
   const [who, setWhoState] = useState(() => localStorage.getItem('ka_who') || 'Kishan')
   const [showWhoModal, setShowWhoModal] = useState(false)
   const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem('ka_unlocked') === '1')
+  const toastTimerRef = useRef(null)
 
-  const showToast = (msg) => {
+  const showToast = useCallback((msg) => {
     setToast(msg)
-    setTimeout(() => setToast(null), 2800)
-  }
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = setTimeout(() => setToast(null), 2800)
+  }, [])
 
   const selectWho = (name) => {
     setWhoState(name)
@@ -102,9 +145,18 @@ export default function App() {
     if (unlocked && !localStorage.getItem('ka_who')) setShowWhoModal(true)
   }, [unlocked])
 
+  // iOS standalone mode - handle back swipe
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone
+    if (isStandalone) {
+      document.body.style.overscrollBehavior = 'none'
+    }
+  }, [])
+
   // Show lock screen if not yet unlocked
   if (!unlocked) {
-    return <LockScreen onUnlock={() => setUnlocked(true)} />
+    return <LockScreen onUnlock={() => { setUnlocked(true); sessionStorage.setItem('ka_unlocked', '1') }} />
   }
 
   return (
@@ -112,8 +164,10 @@ export default function App() {
       <WhoContext.Provider value={{ who, setWho: selectWho }}>
         <div style={{
           maxWidth: 480, margin: '0 auto',
-          minHeight: '100vh', display: 'flex',
+          minHeight: '100dvh',
+          display: 'flex',
           flexDirection: 'column', position: 'relative',
+          paddingTop: 'var(--safe-top)',
         }}>
           <Petals />
 
@@ -129,7 +183,7 @@ export default function App() {
           </header>
 
           {/* ── Pages ── */}
-          <main style={{ flex: 1, paddingBottom: 70, position: 'relative' }}>
+          <main style={styles.main}>
             <AnimatePresence mode="wait">
               <Routes location={location} key={location.pathname}>
                 <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
@@ -144,39 +198,68 @@ export default function App() {
 
           {/* ── Bottom Nav ── */}
           <nav style={styles.nav}>
-            {NAV.map(n => {
-              const active = location.pathname === n.path
-              return (
-                <button key={n.path} style={styles.navItem} onClick={() => navigate(n.path)}>
-                  <span style={{ fontSize: '1.25rem', lineHeight: 1, transform: active ? 'scale(1.15)' : 'scale(1)', transition: 'transform 0.2s', display: 'block' }}>
-                    {n.icon}
-                  </span>
-                  <span style={{
-                    fontSize: '0.58rem', textTransform: 'uppercase', letterSpacing: '0.5px',
-                    color: active ? 'var(--mauve-deep)' : 'var(--text-light)',
-                    fontWeight: active ? 700 : 400,
-                  }}>
-                    {n.label}
-                  </span>
-                </button>
-              )
-            })}
+            <div style={styles.navInner}>
+              {NAV.map(n => {
+                const active = location.pathname === n.path
+                return (
+                  <button
+                    key={n.path}
+                    id={`nav-${n.label.toLowerCase()}`}
+                    style={styles.navItem}
+                    onClick={() => navigate(n.path)}
+                  >
+                    <span style={{
+                      fontSize: '1.25rem',
+                      lineHeight: 1,
+                      transform: active ? 'scale(1.18) translateY(-2px)' : 'scale(1)',
+                      transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                      display: 'block',
+                    }}>
+                      {n.icon}
+                    </span>
+                    <span style={{
+                      fontSize: '0.58rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      color: active ? 'var(--mauve-deep)' : 'var(--text-light)',
+                      fontWeight: active ? 700 : 400,
+                      transition: 'color 0.2s, font-weight 0.2s',
+                    }}>
+                      {n.label}
+                    </span>
+                    {active && (
+                      <span style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: 20,
+                        height: 3,
+                        borderRadius: 2,
+                        background: 'var(--mauve-deep)',
+                        transition: 'all 0.3s',
+                      }} />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
           </nav>
 
           {toast && <Toast msg={toast} />}
 
           {/* ── Who are you modal ── */}
           <Modal open={showWhoModal} onClose={() => who && setShowWhoModal(false)} title="Who's using the app? 💕">
-            <p style={{ fontSize: '0.88rem', color: 'var(--text-light)', marginBottom: 16, textAlign: 'center' }}>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: 18, textAlign: 'center', lineHeight: 1.6 }}>
               Tell us who you are so we can personalise your experience!
             </p>
             <div style={{ display: 'flex', gap: 12 }}>
               <button style={styles.bigWhoBtn} onClick={() => selectWho('Kishan')}>
-                <div style={{ fontSize: '1.8rem', marginBottom: 4 }}>💙</div>
+                <div style={{ fontSize: '2rem', marginBottom: 6 }}>💙</div>
                 <strong>Kishan</strong>
               </button>
               <button style={styles.bigWhoBtn} onClick={() => selectWho('Aditi')}>
-                <div style={{ fontSize: '1.8rem', marginBottom: 4 }}>🌸</div>
+                <div style={{ fontSize: '2rem', marginBottom: 6 }}>🌸</div>
                 <strong>Aditi</strong>
               </button>
             </div>
@@ -193,41 +276,81 @@ const styles = {
     background: 'linear-gradient(135deg, var(--mauve-deep) 0%, var(--mauve) 100%)',
     color: 'white',
     padding: '14px 16px 12px',
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    position: 'sticky', top: 0, zIndex: 100,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    position: 'sticky',
+    top: 0,
+    zIndex: 100,
     boxShadow: '0 4px 20px rgba(107,63,82,0.3)',
+    WebkitBackdropFilter: 'blur(10px)',
+    backdropFilter: 'blur(10px)',
   },
   topbarTitle: {
     fontFamily: "'Playfair Display', serif",
-    fontSize: '1.15rem', letterSpacing: '0.5px',
+    fontSize: '1.15rem',
+    letterSpacing: '0.5px',
   },
   whoTag: {
     background: 'rgba(255,255,255,0.18)',
     border: '1px solid rgba(255,255,255,0.3)',
-    borderRadius: 20, color: 'white',
-    padding: '5px 12px', fontSize: '0.8rem',
-    cursor: 'pointer', fontFamily: "'Lato', sans-serif",
+    borderRadius: 20,
+    color: 'white',
+    padding: '6px 14px',
+    fontSize: '0.82rem',
+    cursor: 'pointer',
+    fontFamily: "Lato, sans-serif",
+    transition: 'all 0.2s',
+    WebkitTapHighlightColor: 'transparent',
+  },
+  main: {
+    flex: 1,
+    paddingBottom: 'calc(70px + var(--safe-bottom))',
+    position: 'relative',
+    overflowX: 'hidden',
   },
   nav: {
-    position: 'fixed', bottom: 0,
-    left: '50%', transform: 'translateX(-50%)',
-    width: '100%', maxWidth: 480,
-    background: 'white', display: 'flex',
-    borderTop: '1px solid rgba(200,120,140,0.15)',
-    boxShadow: '0 -4px 20px rgba(200,120,140,0.12)',
+    position: 'fixed',
+    bottom: 0,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: '100%',
+    maxWidth: 480,
+    background: 'rgba(255,255,255,0.95)',
+    WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+    backdropFilter: 'saturate(180%) blur(20px)',
+    borderTop: '1px solid rgba(200,120,140,0.12)',
+    boxShadow: '0 -4px 20px rgba(200,120,140,0.08)',
     zIndex: 100,
+    paddingBottom: 'var(--safe-bottom)',
+  },
+  navInner: {
+    display: 'flex',
   },
   navItem: {
-    flex: 1, display: 'flex', flexDirection: 'column',
-    alignItems: 'center', padding: '10px 4px 12px',
-    gap: 3, background: 'none', border: 'none', cursor: 'pointer',
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '10px 4px 10px',
+    gap: 3,
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    position: 'relative',
+    WebkitTapHighlightColor: 'transparent',
   },
   bigWhoBtn: {
-    flex: 1, padding: '20px 14px',
-    border: '2px solid var(--border)', borderRadius: 16,
-    background: 'var(--petal)', cursor: 'pointer',
-    fontFamily: "'Lato', sans-serif",
-    lineHeight: 1.4, transition: 'all 0.2s',
+    flex: 1,
+    padding: '22px 14px',
+    border: '2px solid var(--border)',
+    borderRadius: 18,
+    background: 'var(--petal)',
+    cursor: 'pointer',
+    fontFamily: "Lato, sans-serif",
+    lineHeight: 1.4,
+    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
     textAlign: 'center',
+    WebkitTapHighlightColor: 'transparent',
   },
 }

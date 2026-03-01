@@ -2,16 +2,15 @@ import React, { useState } from 'react'
 
 // The secret answer — April 21 2025
 const SECRET_MONTH = '04'
-const SECRET_DAY   = '21'
-const SECRET_YEAR  = '2025'
-// Combined as a date input value
+const SECRET_DAY = '21'
+const SECRET_YEAR = '2025'
 const CORRECT_VALUE = '2025-04-21'
 
 export default function LockScreen({ onUnlock }) {
-  const [val,      setVal]      = useState('')
-  const [shake,    setShake]    = useState(false)
+  const [val, setVal] = useState('')
+  const [shake, setShake] = useState(false)
   const [attempts, setAttempts] = useState(0)
-  const [wrong,    setWrong]    = useState(false)
+  const [wrong, setWrong] = useState(false)
 
   const tryUnlock = () => {
     if (val === CORRECT_VALUE) {
@@ -39,7 +38,6 @@ export default function LockScreen({ onUnlock }) {
           When did our relationship begin?
         </div>
 
-        {/* Native date picker — works perfectly on mobile */}
         <input
           type="date"
           value={val}
@@ -55,8 +53,8 @@ export default function LockScreen({ onUnlock }) {
         {wrong && (
           <div style={s.wrongMsg}>
             {attempts >= 3
-              ? '💡 Hint: It\'s the day we started 💕'
-              : 'That\'s not right, try again 🌸'}
+              ? "💡 Hint: It's the day we started 💕"
+              : "That's not right, try again 🌸"}
           </div>
         )}
 
@@ -95,6 +93,8 @@ const s = {
     background: 'linear-gradient(160deg, #fdf0f5 0%, #f5dde0 45%, #e8d0d8 100%)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     padding: 20,
+    paddingTop: 'calc(20px + env(safe-area-inset-top, 0px))',
+    paddingBottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
   },
   bg: {
     position: 'absolute', inset: 0, pointerEvents: 'none',
@@ -109,45 +109,49 @@ const s = {
     boxShadow: '0 20px 60px rgba(180,100,120,0.22)',
     position: 'relative',
   },
-  hearts:   { fontSize: '2rem', marginBottom: 4, letterSpacing: 8 },
+  hearts: { fontSize: '2rem', marginBottom: 4, letterSpacing: 8 },
   lockIcon: { fontSize: '2.8rem', marginBottom: 10 },
   title: {
     fontFamily: "'Playfair Display', serif",
-    fontSize: '1.8rem', color: '#6d3f52', marginBottom: 8,
+    fontSize: 'clamp(1.4rem, 5vw, 1.8rem)', color: '#6d3f52', marginBottom: 8,
   },
   sub: {
-    fontSize: '0.88rem', color: '#9b6b7b',
+    fontSize: '0.9rem', color: '#9b6b7b',
     lineHeight: 1.6, marginBottom: 22,
   },
   question: {
     fontFamily: "'Playfair Display', serif",
     fontStyle: 'italic', fontSize: '1rem', color: '#6d3f52',
     background: 'linear-gradient(135deg, #fdf0f5, #f5e8ee)',
-    borderRadius: 12, padding: '12px 16px', marginBottom: 16,
+    borderRadius: 14, padding: '14px 18px', marginBottom: 16,
   },
   input: {
-    width: '100%', padding: '13px 16px',
+    width: '100%', padding: '14px 16px',
     border: '2px solid rgba(200,120,140,0.3)',
     borderRadius: 14,
-    fontFamily: "'Lato', sans-serif",
+    fontFamily: "Lato, sans-serif",
     fontSize: '1rem', color: '#4a3040',
     background: '#fdf0f2', outline: 'none',
     textAlign: 'center', marginBottom: 10,
     display: 'block', boxSizing: 'border-box',
     transition: 'border-color 0.2s',
+    WebkitAppearance: 'none',
+    appearance: 'none',
   },
   wrongMsg: {
-    fontSize: '0.8rem', color: '#c05050',
-    background: '#fff0f0', borderRadius: 10,
-    padding: '8px 12px', marginBottom: 10,
+    fontSize: '0.82rem', color: '#c05050',
+    background: '#fff0f0', borderRadius: 12,
+    padding: '10px 14px', marginBottom: 10,
   },
   btn: {
-    width: '100%', padding: '13px',
+    width: '100%', padding: '14px',
     background: 'linear-gradient(135deg, #9b6b7b, #6d3f52)',
     color: 'white', border: 'none', borderRadius: 50,
-    fontFamily: "'Lato', sans-serif",
+    fontFamily: "Lato, sans-serif",
     fontSize: '0.95rem', cursor: 'pointer',
     marginTop: 4, letterSpacing: '0.3px',
+    transition: 'all 0.2s',
+    WebkitTapHighlightColor: 'transparent',
   },
   footer: { fontSize: '0.72rem', color: '#b89090', marginTop: 16 },
 }

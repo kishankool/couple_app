@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext } from 'react'
+import React, { useState, useEffect, useContext, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import Card, { CardTitle } from '../components/Card'
 import Modal from '../components/Modal'
 import Button from '../components/Button'
@@ -93,6 +94,9 @@ export default function More() {
   const [events, setEvents] = useState([])
   const [moods, setMoods] = useState([])
 
+  // Ref for the date-randomizer interval so it can be cleared on unmount
+  const intervalRef = useRef(null)
+
   // Modal open state
   const [ideaOpen, setIdeaOpen] = useState(false)
   const [eventOpen, setEventOpen] = useState(false)
@@ -167,6 +171,32 @@ export default function More() {
 
   const allIdeas = [...DEFAULT_IDEAS, ...ideas]
 
+  // Date Night Randomizer
+  const [pickedIdea, setPickedIdea] = useState(null)
+  const [spinning, setSpinning] = useState(false)
+
+  // Clear the interval on unmount so we never set state on an unmounted component
+  useEffect(() => () => clearInterval(intervalRef.current), [])
+
+  const spinIdeas = () => {
+    if (allIdeas.length === 0) return
+    // Clear any previous spin that might still be ticking
+    clearInterval(intervalRef.current)
+    setSpinning(true)
+    setPickedIdea(null)
+    let count = 0
+    intervalRef.current = setInterval(() => {
+      setPickedIdea(allIdeas[Math.floor(Math.random() * allIdeas.length)])
+      count++
+      if (count > 14) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+        setPickedIdea(allIdeas[Math.floor(Math.random() * allIdeas.length)])
+        setSpinning(false)
+      }
+    }, 80)
+  }
+
   // Preview label for the event form
   const eventPreview = eDate
     ? new Date(`${eDate}T${eTime || '12:00'}`).toLocaleString('en-IN', {
@@ -222,6 +252,38 @@ export default function More() {
       {/* ── Date Ideas Tab ── */}
       {activeTab === 'ideas' && (
         <div style={{ animation: 'fadeUp 0.25s ease' }}>
+          {/* Date Night Randomizer */}
+          <div style={S.randomizerBox}>
+            <div style={S.randomizerTitle}>🎲 Date Night Randomizer</div>
+            <div style={S.randomizerSub}>Can't decide? Let fate choose!</div>
+            <AnimatePresence mode="wait">
+              {pickedIdea ? (
+                <motion.div
+                  key={pickedIdea.name}
+                  initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  style={S.pickedIdeaCard}
+                >
+                  <span style={{ fontSize: '2rem' }}>{pickedIdea.icon}</span>
+                  <div style={S.pickedIdeaName}>{pickedIdea.name}</div>
+                  {pickedIdea.desc && <div style={S.pickedIdeaDesc}>{pickedIdea.desc}</div>}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="placeholder"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  style={S.randomizerPlaceholder}
+                >
+                  {spinning ? '🎲 Picking…' : '❓ Press spin!'}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <button style={S.spinBtn} onClick={spinIdeas} disabled={spinning}>
+              {spinning ? '⏳ Spinning…' : '🎲 Spin!'}
+            </button>
+          </div>
+
           <Card>
             <CardTitle icon="🌹">Date Ideas</CardTitle>
             {allIdeas.length === 0 ? (
@@ -430,6 +492,35 @@ const styles = {
 }
 
 const S = {
+  // Randomizer
+  randomizerBox: {
+    background: 'linear-gradient(135deg, var(--mauve-deep), var(--mauve))',
+    borderRadius: 22, padding: '22px 18px',
+    textAlign: 'center', color: 'white', marginBottom: 14,
+    boxShadow: '0 8px 28px rgba(107,63,82,0.28)',
+  },
+  randomizerTitle: { fontFamily: "'Playfair Display', serif", fontSize: '1.05rem', marginBottom: 4 },
+  randomizerSub: { fontSize: '0.75rem', opacity: 0.75, marginBottom: 14 },
+  pickedIdeaCard: {
+    background: 'rgba(255,255,255,0.18)', borderRadius: 16,
+    padding: '16px', marginBottom: 14, backdropFilter: 'blur(8px)',
+    border: '1px solid rgba(255,255,255,0.25)',
+  },
+  pickedIdeaName: { fontFamily: "'Playfair Display', serif", fontSize: '1rem', marginTop: 6, color: 'white' },
+  pickedIdeaDesc: { fontSize: '0.78rem', opacity: 0.8, marginTop: 4 },
+  randomizerPlaceholder: {
+    height: 70, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '0.9rem', opacity: 0.7, marginBottom: 14,
+  },
+  spinBtn: {
+    background: 'rgba(255,255,255,0.25)', border: '2px solid rgba(255,255,255,0.5)',
+    color: 'white', borderRadius: 50, padding: '10px 28px',
+    fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer',
+    fontFamily: 'Lato, sans-serif', letterSpacing: 0.5,
+    WebkitTapHighlightColor: 'transparent',
+    transition: 'all 0.2s',
+  },
+
   ideaRow: {
     display: 'flex', alignItems: 'center', gap: 10,
     padding: '12px 0', borderBottom: '1px solid var(--border)',

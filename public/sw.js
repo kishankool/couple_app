@@ -6,8 +6,14 @@ const CACHE_NAME = 'ka-app-v4'
 // On install — skip waiting so new SW activates immediately
 self.addEventListener('install', () => self.skipWaiting())
 
-// On activate — claim all clients
-self.addEventListener('activate', e => e.waitUntil(clients.claim()))
+// On activate — claim all clients and remove old caches
+self.addEventListener('activate', e => e.waitUntil(
+  caches.keys().then(keys =>
+    Promise.all(
+      keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+    )
+  ).then(() => clients.claim())
+))
 
 // Fetch — network first, fall back to cache for navigation requests
 self.addEventListener('fetch', e => {

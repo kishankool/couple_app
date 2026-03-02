@@ -558,6 +558,19 @@ textarea { resize: vertical; min-height: 80px; }
   to   { opacity: 1; transform: scale(1); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .tl-card-thumb,
+  .tl-card-img {
+    animation: none;
+  }
+  .tl-node {
+    animation: none;
+  }
+  .tl-path-flow {
+    animation: none;
+  }
+}
+
 /* ── Responsive: stack on very narrow screens ── */
 @media (max-width: 380px) {
   .tl-card { width: calc(50% - 34px); }

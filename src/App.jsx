@@ -141,8 +141,8 @@ export default function App() {
     if (isStandalone) {
       document.body.style.overscrollBehavior = 'none'
     }
-    // On fresh session, always start at Home
-    if (!sessionStorage.getItem('ka_session_started')) {
+    // On fresh session in standalone PWA mode, always start at Home
+    if (isStandalone && !sessionStorage.getItem('ka_session_started')) {
       sessionStorage.setItem('ka_session_started', '1')
       if (location.pathname !== '/') {
         navigate('/', { replace: true })

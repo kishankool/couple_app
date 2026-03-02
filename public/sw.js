@@ -1,7 +1,7 @@
 // Service Worker for Kishan & Aditi PWA
 // Enables: Add to Home Screen, offline splash, Web Push notifications
 
-const CACHE_NAME = 'ka-app-v3'
+const CACHE_NAME = 'ka-app-v4'
 
 // On install — skip waiting so new SW activates immediately
 self.addEventListener('install', () => self.skipWaiting())

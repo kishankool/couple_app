@@ -386,6 +386,7 @@ textarea { resize: vertical; min-height: 80px; }
   border-radius: 10px;
   object-fit: cover;
   flex-shrink: 0;
+  animation: img-fade-in 0.5s ease both;
 }
 .tl-card-preview-text { min-width: 0; flex: 1; }
 .tl-card-mini-title {
@@ -414,6 +415,7 @@ textarea { resize: vertical; min-height: 80px; }
   display: block;
   border-radius: 2px;
   filter: contrast(1.04) saturate(0.95);
+  animation: img-fade-in 0.6s ease both;
 }
 .tl-card-placeholder {
   width: 100%;
@@ -549,6 +551,24 @@ textarea { resize: vertical; min-height: 80px; }
 
 .tl-path-flow {
   animation: tl-flow 2s linear infinite;
+}
+
+@keyframes img-fade-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-card-thumb,
+  .tl-card-img {
+    animation: none;
+  }
+  .tl-node {
+    animation: none;
+  }
+  .tl-path-flow {
+    animation: none;
+  }
 }
 
 /* ── Responsive: stack on very narrow screens ── */

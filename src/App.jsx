@@ -134,11 +134,19 @@ export default function App() {
   }, [unlocked])
 
   // iOS standalone mode - handle back swipe
+  // Also navigate to Home on fresh app launch so users don't land on a stale page
   useEffect(() => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches
       || window.navigator.standalone
     if (isStandalone) {
       document.body.style.overscrollBehavior = 'none'
+    }
+    // On fresh session in standalone PWA mode, always start at Home
+    if (isStandalone && !sessionStorage.getItem('ka_session_started')) {
+      sessionStorage.setItem('ka_session_started', '1')
+      if (location.pathname !== '/') {
+        navigate('/', { replace: true })
+      }
     }
   }, [])
 

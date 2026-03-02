@@ -94,6 +94,9 @@ export default function More() {
   const [events, setEvents] = useState([])
   const [moods, setMoods] = useState([])
 
+  // Ref for the date-randomizer interval so it can be cleared on unmount
+  const intervalRef = useRef(null)
+
   // Modal open state
   const [ideaOpen, setIdeaOpen] = useState(false)
   const [eventOpen, setEventOpen] = useState(false)
@@ -171,16 +174,23 @@ export default function More() {
   // Date Night Randomizer
   const [pickedIdea, setPickedIdea] = useState(null)
   const [spinning, setSpinning] = useState(false)
+
+  // Clear the interval on unmount so we never set state on an unmounted component
+  useEffect(() => () => clearInterval(intervalRef.current), [])
+
   const spinIdeas = () => {
     if (allIdeas.length === 0) return
+    // Clear any previous spin that might still be ticking
+    clearInterval(intervalRef.current)
     setSpinning(true)
     setPickedIdea(null)
     let count = 0
-    const interval = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       setPickedIdea(allIdeas[Math.floor(Math.random() * allIdeas.length)])
       count++
       if (count > 14) {
-        clearInterval(interval)
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
         setPickedIdea(allIdeas[Math.floor(Math.random() * allIdeas.length)])
         setSpinning(false)
       }

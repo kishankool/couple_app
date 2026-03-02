@@ -5,6 +5,22 @@ import Modal from '../components/Modal'
 import { fsAdd, fsDelete, fsUpdate, fsListen } from '../firebase'
 import { WhoContext, ToastContext, RoleContext } from '../App'
 
+// Only allow safe URL schemes; returns a sanitised URL or null if rejected.
+const ALLOWED_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:']
+function safeUrl(raw) {
+    if (!raw) return null
+    let href = raw.trim()
+    if (!href) return null
+    // Prepend https:// if no scheme present
+    if (!/^[a-z][a-z0-9+\-.]*:/i.test(href)) href = 'https://' + href
+    try {
+        const { protocol } = new URL(href)
+        return ALLOWED_SCHEMES.includes(protocol) ? href : null
+    } catch {
+        return null
+    }
+}
+
 export default function Wishlist() {
     const { who } = useContext(WhoContext)
     const showToast = useContext(ToastContext)
@@ -30,11 +46,16 @@ export default function Wishlist() {
     const save = async () => {
         if (!name.trim()) return showToast('Enter an item name 🎁')
         setSaving(true)
+        const sanitisedLink = link.trim() ? safeUrl(link.trim()) : ''
+        if (link.trim() && !sanitisedLink) {
+            setSaving(false) // Reset saving state before returning
+            return showToast('Please enter a valid http/https link 🔗')
+        }
         try {
             await fsAdd('wishlist', {
                 who,
                 name: name.trim(),
-                link: link.trim(),
+                link: sanitisedLink || '',
                 price: price.trim(),
                 bought: false,
             })
@@ -138,8 +159,8 @@ export default function Wishlist() {
                                     <div style={s.itemPrice}>💰 {item.price}</div>
                                 )}
 
-                                {item.link && (
-                                    <a href={item.link} target="_blank" rel="noopener noreferrer" style={s.itemLink}>
+                                {item.link && safeUrl(item.link) && (
+                                    <a href={safeUrl(item.link)} target="_blank" rel="noopener noreferrer" style={s.itemLink}>
                                         🔗 View item
                                     </a>
                                 )}

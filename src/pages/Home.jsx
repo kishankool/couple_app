@@ -135,7 +135,8 @@ export default function Home() {
     if (!localStorage.getItem(seenKey)) {
       localStorage.setItem(seenKey, '1')
       setConfettiBurst(true)
-      setTimeout(() => setConfettiBurst(false), 100)
+      // Reset after the confetti component's default duration (3500ms)
+      setTimeout(() => setConfettiBurst(false), 3500)
     }
   }, [time.days])
 
@@ -200,12 +201,13 @@ export default function Home() {
     const emoji = type === 'hug' ? '🤗' : '💋'
     const label = type === 'hug' ? 'hug' : 'kiss'
     setFloatingEmoji(emoji)
+    // Fire-and-forget push — persistence must succeed regardless
+    notifyPartner(who, {
+      title: `${emoji} ${who} sent you a ${label}!`,
+      body: `Open the app to send one back! 💕`,
+      url: '/',
+    }).catch(() => { })
     try {
-      await notifyPartner(who, {
-        title: `${emoji} ${who} sent you a ${label}!`,
-        body: `Open the app to send one back! 💕`,
-        url: '/',
-      })
       await fsAdd('hugs_kisses', { who, type, date: new Date().toISOString() })
       showToast(`${emoji} Sent to ${who === 'Kishan' ? 'Aditi' : 'Kishan'}!`)
     } catch { showToast(`${emoji} Sent!`) }
@@ -459,15 +461,18 @@ export default function Home() {
             { icon: '💬', label: 'Questions', path: '/questions', bg: 'linear-gradient(135deg, #e8effe, #dde8fe)' },
             { icon: '🎁', label: 'Wishlist', path: '/wishlist', bg: 'linear-gradient(135deg, #e8fde8, #d4f0d4)' },
           ].map(item => (
-            <motion.div
+            <motion.button
               key={item.path}
+              type="button"
               whileTap={{ scale: 0.95 }}
+              aria-label={item.label}
               style={{ ...styles.quickNavCard, background: item.bg }}
               onClick={() => navigate(item.path)}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(item.path) } }}
             >
               <div style={{ fontSize: '1.8rem' }}>{item.icon}</div>
               <div style={styles.quickNavLabel}>{item.label}</div>
-            </motion.div>
+            </motion.button>
           ))}
         </div>
       )}

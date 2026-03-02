@@ -4,6 +4,7 @@ import Button from '../components/Button'
 import Modal from '../components/Modal'
 import { fsAdd, fsDelete, fsUpdate, fsListen } from '../firebase'
 import { WhoContext, ToastContext, RoleContext } from '../App'
+import { USER_KISHAN, USER_ADITI } from '../constants'
 
 // Only allow safe URL schemes; returns a sanitised URL or null if rejected.
 const ALLOWED_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:']
@@ -79,7 +80,7 @@ export default function Wishlist() {
     }
 
     // Partner is the opposite of the logged-in user
-    const partner = who === 'Kishan' ? 'Aditi' : 'Kishan'
+    const partner = who === USER_KISHAN ? USER_ADITI : USER_KISHAN
 
     const myItems = items.filter(i => i.who === who)
     const partnerItems = items.filter(i => i.who === partner)
@@ -108,8 +109,8 @@ export default function Wishlist() {
             <div className="tabs-container">
                 {[
                     { key: 'all', label: 'All', icon: '🎁', count: items.length },
-                    { key: 'mine', label: 'Mine', icon: who === 'Kishan' ? '💙' : '🌸', count: myItems.length },
-                    { key: 'partner', label: partner, icon: who === 'Kishan' ? '🌸' : '💙', count: partnerItems.length },
+                    { key: 'mine', label: 'Mine', icon: who === USER_KISHAN ? '💙' : '🌸', count: myItems.length },
+                    { key: 'partner', label: partner, icon: who === USER_KISHAN ? '🌸' : '💙', count: partnerItems.length },
                 ].map(tab => (
                     <button
                         key={tab.key}
@@ -146,7 +147,7 @@ export default function Wishlist() {
 
                                 <div style={s.itemTop}>
                                     <div style={s.ownerTag}>
-                                        {item.who === 'Kishan' ? '💙' : '🌸'} {item.who}'s wish
+                                        {item.who === USER_KISHAN ? '💙' : '🌸'} {item.who}'s wish
                                     </div>
                                     {!isVisitor && (
                                         <button style={s.delBtn} onClick={() => del(item.id)}>🗑</button>
@@ -159,11 +160,14 @@ export default function Wishlist() {
                                     <div style={s.itemPrice}>💰 {item.price}</div>
                                 )}
 
-                                {item.link && safeUrl(item.link) && (
-                                    <a href={safeUrl(item.link)} target="_blank" rel="noopener noreferrer" style={s.itemLink}>
-                                        🔗 View item
-                                    </a>
-                                )}
+                                {(() => {
+                                    const url = safeUrl(item.link)
+                                    return url ? (
+                                        <a href={url} target="_blank" rel="noopener noreferrer" style={s.itemLink}>
+                                            🔗 View item
+                                        </a>
+                                    ) : null
+                                })()}
 
                                 {!isVisitor && !item.bought && item.who !== who && (
                                     <button
@@ -173,7 +177,7 @@ export default function Wishlist() {
                                         🎀 Mark as Gifted!
                                     </button>
                                 )}
-                                {item.bought && (
+                                {!isVisitor && item.bought && (
                                     <button style={s.undoBtn} onClick={() => toggleBought(item)}>
                                         ↩ Undo
                                     </button>

@@ -143,9 +143,11 @@ export default function Home() {
   // Listen to moods
   useEffect(() => {
     if (isVisitor) return
+    // Compute today inside the effect so the filter never uses a stale value
+    const todayStr = new Date().toDateString()
     const unsub = fsListen('moods', data => {
       setTodayMoods(data.filter(m => {
-        try { return new Date(m.date).toDateString() === today } catch { return false }
+        try { return new Date(m.date).toDateString() === todayStr } catch { return false }
       }))
     })
     return unsub
@@ -159,7 +161,7 @@ export default function Home() {
       unsubs.push(fsListen('notes', d => setStats(s => ({ ...s, notes: d.length }))))
       unsubs.push(fsListen('todos', d => setStats(s => ({ ...s, todos: d.length, done: d.filter(t => t.done).length }))))
     }
-    return () => unsubs.forEach(u => u())
+    return () => unsubs.forEach(u => { u() })
   }, [isVisitor])
 
   // Load Good Morning / Good Night data
@@ -209,8 +211,11 @@ export default function Home() {
     }).catch(() => { })
     try {
       await fsAdd('hugs_kisses', { who, type, date: new Date().toISOString() })
-      showToast(`${emoji} Sent to ${who === 'Kishan' ? 'Aditi' : 'Kishan'}!`)
-    } catch { showToast(`${emoji} Sent!`) }
+      showToast(`${emoji} Sent to ${who === 'Kishan' ? 'Aditi' : 'Kishan'}! ${emoji}`)
+    } catch (err) {
+      console.error('Failed to save hug/kiss:', err)
+      showToast(`Could not send ${label} — please try again`)
+    }
     setSendingHug(false)
   }
 
@@ -221,13 +226,17 @@ export default function Home() {
       const ref = doc(db, 'good_morning', todayKey)
       await setDoc(ref, { [`${who}GM`]: true }, { merge: true })
       setGmData(d => ({ ...(d || {}), [`${who}GM`]: true }))
-      await notifyPartner(who, {
+      // Push is best-effort — don't let it block or mask the write result
+      notifyPartner(who, {
         title: `☀️ Good Morning from ${who}!`,
         body: `${who} is wishing you a wonderful morning 🌸`,
         url: '/',
-      })
+      }).catch(() => { })
       showToast('Good morning sent! ☀️')
-    } catch { showToast('Good morning! ☀️') }
+    } catch (err) {
+      console.error('Failed to send good morning:', err)
+      showToast('Could not send — please try again')
+    }
     setSendingGM(false)
   }
 
@@ -238,13 +247,17 @@ export default function Home() {
       const ref = doc(db, 'good_morning', todayKey)
       await setDoc(ref, { [`${who}GN`]: true }, { merge: true })
       setGmData(d => ({ ...(d || {}), [`${who}GN`]: true }))
-      await notifyPartner(who, {
+      // Push is best-effort — don't let it block or mask the write result
+      notifyPartner(who, {
         title: `🌙 Good Night from ${who}!`,
         body: `${who} is wishing you sweet dreams 💕`,
         url: '/',
-      })
+      }).catch(() => { })
       showToast('Good night sent! 🌙')
-    } catch { showToast('Good night! 🌙') }
+    } catch (err) {
+      console.error('Failed to send good night:', err)
+      showToast('Could not send — please try again')
+    }
     setSendingGN(false)
   }
 
@@ -261,7 +274,10 @@ export default function Home() {
         body: `${who === 'Kishan' ? 'Aditi' : 'Kishan'}, you're on ${who}'s mind 💕`,
         url: '/',
       }).catch(() => { })
-    } catch { showToast('Sending miss you…') }
+    } catch (err) {
+      console.error('Failed to save miss-you:', err)
+      showToast('Could not send — please try again')
+    }
     setMissTapping(false)
   }
 

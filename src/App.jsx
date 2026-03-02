@@ -7,6 +7,9 @@ import Memories from './pages/Memories'
 import Updates from './pages/Updates'
 import Todos from './pages/Todos'
 import More from './pages/More'
+import LoveJar from './pages/LoveJar'
+import CoupleQuestions from './pages/CoupleQuestions'
+import Wishlist from './pages/Wishlist'
 import Petals from './components/Petals'
 import Toast from './components/Toast'
 import Modal from './components/Modal'
@@ -208,6 +211,9 @@ export default function App() {
                   <Route path="/updates" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Updates /></PageWrapper>} />
                   <Route path="/todos" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Todos /></PageWrapper>} />
                   <Route path="/more" element={<PageWrapper><More /></PageWrapper>} />
+                  <Route path="/love-jar" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><LoveJar /></PageWrapper>} />
+                  <Route path="/questions" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><CoupleQuestions /></PageWrapper>} />
+                  <Route path="/wishlist" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Wishlist /></PageWrapper>} />
                 </Routes>
               </AnimatePresence>
             </main>

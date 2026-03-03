@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Button from '../components/Button'
-import { fsAdd, fsListen, fsSet } from '../firebase'
+import { db } from '../firebase'
+import {
+    doc, setDoc, collection, query, onSnapshot, serverTimestamp,
+} from 'firebase/firestore'
 import { WhoContext, ToastContext, RoleContext } from '../App'
 import { notifyPartner } from '../push'
 
@@ -21,6 +24,11 @@ const QUESTIONS = [
     { q: "Morning person or night owl — and do you think we match?", icon: "🌙" },
     { q: "What's one thing I do that always makes you smile?", icon: "😊" },
     { q: "If we had a couple superpower, what would it be?", icon: "🦸" },
+    { q: "What's a little habit of mine you find adorable?", icon: "🌸" },
+    { q: "What's the first thing you noticed about me?", icon: "👀" },
+    { q: "What's a place you'd love to visit for our anniversary?", icon: "🎊" },
+    { q: "Which of my qualities do you want to absorb for yourself?", icon: "💫" },
+    { q: "If we wrote a book about us, what would the title be?", icon: "📖" },
 ]
 
 // Get today's question index (changes daily)
@@ -30,68 +38,109 @@ function getTodayIdx() {
     return Math.floor((Date.now() - epoch) / msPerDay) % QUESTIONS.length
 }
 
+function getTodayKey() {
+    return new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
+}
+
 export default function CoupleQuestions() {
     const { who } = useContext(WhoContext)
     const showToast = useContext(ToastContext)
     const { isVisitor } = useContext(RoleContext)
 
     const todayIdx = getTodayIdx()
-    const todayKey = `question_${new Date().toLocaleDateString('en-CA')}`
+    const todayKey = getTodayKey()
     const todayQ = QUESTIONS[todayIdx]
 
     const [myAnswer, setMyAnswer] = useState('')
+    const [savedAnswer, setSavedAnswer] = useState('') // what's persisted in Firestore
     const [submitted, setSubmitted] = useState(false)
     const [saving, setSaving] = useState(false)
-    const [answers, setAnswers] = useState([])
+    const [partnerAnswer, setPartnerAnswer] = useState(null)
     const [viewingPast, setViewPast] = useState(false)
-    const [pastAnswers, setPastAnswers] = useState([])
+    const [pastGroups, setPastGroups] = useState([])
 
-    // Listen to today's answers
+    // ── Real-time listener on the couple_answers/<todayKey> doc ──
+    // Structure: { Kishan: { answer, date }, Aditi: { answer, date } }
     useEffect(() => {
-        const unsub = fsListen('couple_answers', d => {
-            const today = d.filter(a => a.questionKey === todayKey)
-            setAnswers(today)
-            const mine = today.find(a => a.who === who)
-            if (mine) { setSubmitted(true); setMyAnswer(mine.answer) }
-            setPastAnswers(d.filter(a => a.questionKey !== todayKey))
+        // Today's answers
+        const todayRef = doc(db, 'couple_answers', todayKey)
+        const unsubToday = onSnapshot(todayRef, snap => {
+            const data = snap.exists() ? snap.data() : {}
+            const mine = data[who]
+            const partner = data[who === 'Kishan' ? 'Aditi' : 'Kishan']
+            if (mine?.answer) {
+                setSavedAnswer(mine.answer)
+                setSubmitted(true)
+                // Pre-fill textarea only on first load (don't overwrite edits)
+                setMyAnswer(prev => prev || mine.answer)
+            }
+            setPartnerAnswer(partner?.answer || null)
+        }, err => {
+            console.warn('couple_answers today listener error:', err)
         })
-        return unsub
+
+        // Past answers — listen to the whole collection except today
+        const pastQ = query(collection(db, 'couple_answers'))
+        const unsubPast = onSnapshot(pastQ, snap => {
+            const groups = []
+            snap.docs.forEach(d => {
+                if (d.id === todayKey) return // skip today
+                const data = d.data()
+                // Only include days that have at least one answer
+                const answers = []
+                if (data.Kishan?.answer) answers.push({ who: 'Kishan', answer: data.Kishan.answer, date: data.Kishan.date })
+                if (data.Aditi?.answer) answers.push({ who: 'Aditi', answer: data.Aditi.answer, date: data.Aditi.date })
+                if (answers.length > 0 && data.question) {
+                    groups.push({ key: d.id, question: data.question, icon: data.icon || '💬', answers })
+                }
+            })
+            // Sort by date descending (most recent first)
+            groups.sort((a, b) => b.key.localeCompare(a.key))
+            setPastGroups(groups.slice(0, 15))
+        }, err => {
+            console.warn('couple_answers past listener error:', err)
+        })
+
+        return () => { unsubToday(); unsubPast() }
     }, [todayKey, who])
 
     const submit = async () => {
-        if (!myAnswer.trim()) return showToast('Write an answer first 💕')
+        const trimmed = myAnswer.trim()
+        if (!trimmed) return showToast('Write an answer first 💕')
         if (isVisitor) return showToast('Only Kishan & Aditi can answer 🔒')
+        if (trimmed === savedAnswer) return showToast('No changes to save ✓')
         setSaving(true)
         try {
-            await fsSet('couple_answers', `${todayKey}_${who}`, {
-                who,
-                questionKey: todayKey,
-                questionIdx: todayIdx,
+            const ref = doc(db, 'couple_answers', todayKey)
+            await setDoc(ref, {
                 question: todayQ.q,
-                answer: myAnswer.trim(),
-                date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-            })
+                icon: todayQ.icon,
+                questionIdx: todayIdx,
+                [who]: {
+                    answer: trimmed,
+                    date: new Date().toLocaleDateString('en-IN', {
+                        day: 'numeric', month: 'short', year: 'numeric'
+                    }),
+                },
+                updatedAt: serverTimestamp(),
+            }, { merge: true })
+            setSavedAnswer(trimmed)
             setSubmitted(true)
-            showToast('Answer saved! 💕')
+            showToast(savedAnswer ? 'Answer updated! ✓' : 'Answer saved! 💕')
             notifyPartner(who, {
-                title: '💬 New couple question answered!',
+                title: '💬 Couple question answered!',
                 body: `${who} answered today's question — go check theirs!`,
                 url: '/questions',
             }).catch(() => { })
-        } catch { showToast('Error saving answer') }
+        } catch (err) {
+            console.error('Failed to save answer:', err)
+            showToast('Error saving answer — try again')
+        }
         setSaving(false)
     }
 
-    const partnerAnswer = answers.find(a => a.who !== who)
-
-    // Group past answers by date
-    const pastGrouped = Object.values(
-        pastAnswers.reduce((acc, a) => {
-            if (!acc[a.questionKey]) acc[a.questionKey] = { key: a.questionKey, question: a.question, answers: [] }
-            acc[a.questionKey].answers.push(a)
-            return acc
-        }, {})
-    ).slice(0, 10)
+    const partner = who === 'Kishan' ? 'Aditi' : 'Kishan'
+    const hasEdited = myAnswer.trim() !== savedAnswer
 
     return (
         <div className="page-content">
@@ -114,23 +163,40 @@ export default function CoupleQuestions() {
                         <div style={s.qText}>{todayQ.q}</div>
                     </div>
 
+                    {/* Status pills */}
+                    <div style={s.statusRow}>
+                        <div style={{ ...s.pill, background: submitted ? '#e8f5e9' : '#fdf0f5', color: submitted ? '#2e7d32' : 'var(--mauve)' }}>
+                            {who === 'Kishan' ? '💙' : '🌸'} {who}: {submitted ? 'Answered ✓' : 'Not answered'}
+                        </div>
+                        <div style={{ ...s.pill, background: partnerAnswer ? '#e8f5e9' : '#fdf0f5', color: partnerAnswer ? '#2e7d32' : 'var(--mauve)' }}>
+                            {who === 'Kishan' ? '🌸' : '💙'} {partner}: {partnerAnswer ? 'Answered ✓' : 'Waiting…'}
+                        </div>
+                    </div>
+
                     {/* Answer input */}
                     {!isVisitor && (
                         <div style={s.answerSection}>
                             <div className="section-label">Your Answer {who === 'Kishan' ? '💙' : '🌸'}</div>
                             <textarea
                                 value={myAnswer}
-                                onChange={e => { setMyAnswer(e.target.value); setSubmitted(false) }}
+                                onChange={e => setMyAnswer(e.target.value)}
                                 placeholder="Write your answer… be honest! 😊"
                                 style={{ marginBottom: 12 }}
                             />
-                            <Button size="full" onClick={submit} disabled={saving}>
-                                {saving ? 'Saving…' : submitted ? 'Update Answer ✓' : 'Submit Answer 💕'}
+                            <Button
+                                size="full"
+                                onClick={submit}
+                                disabled={saving || !myAnswer.trim() || (!hasEdited && submitted)}
+                            >
+                                {saving ? 'Saving…'
+                                    : !hasEdited && submitted ? 'Saved ✓'
+                                        : submitted ? 'Update Answer ✏️'
+                                            : 'Submit Answer 💕'}
                             </Button>
                         </div>
                     )}
 
-                    {/* Reveal partner's answer */}
+                    {/* Reveal partner's answer — only after you've answered */}
                     <AnimatePresence>
                         {submitted && (
                             <motion.div
@@ -138,17 +204,17 @@ export default function CoupleQuestions() {
                                 animate={{ opacity: 1, y: 0 }}
                                 style={s.partnerSection}
                             >
-                                <div className="section-label">{who === 'Kishan' ? 'Aditi' : 'Kishan'}'s Answer</div>
+                                <div className="section-label">{partner}'s Answer</div>
                                 {partnerAnswer ? (
                                     <div style={s.partnerAnswerCard}>
                                         <div style={s.partnerAnswerIcon}>{who === 'Kishan' ? '🌸' : '💙'}</div>
-                                        <div style={s.partnerAnswerText}>"{partnerAnswer.answer}"</div>
+                                        <div style={s.partnerAnswerText}>"{partnerAnswer}"</div>
                                     </div>
                                 ) : (
                                     <div style={s.waitingCard}>
                                         <div style={{ fontSize: '1.8rem', marginBottom: 8 }}>⏳</div>
                                         <div style={{ fontSize: '0.88rem', color: 'var(--text-light)' }}>
-                                            Waiting for {who === 'Kishan' ? 'Aditi' : 'Kishan'} to answer…
+                                            Waiting for {partner} to answer…
                                         </div>
                                     </div>
                                 )}
@@ -159,16 +225,17 @@ export default function CoupleQuestions() {
             ) : (
                 /* Past Answers */
                 <div>
-                    {pastGrouped.length === 0 ? (
+                    {pastGroups.length === 0 ? (
                         <div className="empty-state">
                             <div className="empty-icon">📚</div>
                             <p>No past answers yet.<br />Answer today's question first!</p>
                         </div>
-                    ) : pastGrouped.map((group, i) => (
-                        <div key={group.key} style={{ ...s.pastGroup, animationDelay: `${i * 0.05}s` }}>
+                    ) : pastGroups.map((group, i) => (
+                        <div key={group.key} style={{ ...s.pastGroup, animationDelay: `${Math.min(i * 0.05, 0.4)}s` }}>
+                            <div style={s.pastMeta}>{group.icon} {group.key}</div>
                             <div style={s.pastQ}>{group.question}</div>
                             {group.answers.map(a => (
-                                <div key={a.id} style={s.pastAnswer}>
+                                <div key={a.who} style={s.pastAnswer}>
                                     <span style={s.pastWho}>{a.who === 'Kishan' ? '💙' : '🌸'} {a.who}</span>
                                     <span style={s.pastAnswerText}>{a.answer}</span>
                                 </div>
@@ -191,6 +258,7 @@ const s = {
         fontSize: '0.78rem', color: 'var(--mauve)', cursor: 'pointer',
         fontFamily: 'Lato, sans-serif',
         WebkitTapHighlightColor: 'transparent',
+        transition: 'all 0.2s',
     },
 
     questionCard: {
@@ -199,7 +267,7 @@ const s = {
         padding: '28px 22px',
         textAlign: 'center',
         color: 'white',
-        marginBottom: 20,
+        marginBottom: 14,
         boxShadow: '0 8px 32px rgba(107,63,82,0.3)',
     },
     qIcon: { fontSize: '2.5rem', marginBottom: 10 },
@@ -209,6 +277,18 @@ const s = {
         fontSize: 'clamp(0.95rem, 3vw, 1.15rem)',
         lineHeight: 1.6,
         fontStyle: 'italic',
+    },
+
+    statusRow: {
+        display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap',
+    },
+    pill: {
+        flex: 1, minWidth: 120,
+        borderRadius: 20, padding: '7px 14px',
+        fontSize: '0.76rem', fontWeight: 700,
+        textAlign: 'center',
+        border: '1px solid rgba(0,0,0,0.05)',
+        transition: 'all 0.3s ease',
     },
 
     answerSection: { marginBottom: 20 },
@@ -245,6 +325,11 @@ const s = {
         border: '1px solid var(--border)',
         animation: 'fadeUp 0.3s ease both',
     },
+    pastMeta: {
+        fontSize: '0.65rem', color: 'var(--text-light)',
+        textTransform: 'uppercase', letterSpacing: 1,
+        marginBottom: 6,
+    },
     pastQ: {
         fontFamily: "'Playfair Display', serif",
         fontSize: '0.9rem', color: 'var(--mauve-deep)',
@@ -252,7 +337,7 @@ const s = {
     },
     pastAnswer: {
         display: 'flex', gap: 10, flexDirection: 'column',
-        padding: '8px 0', borderTop: '1px solid var(--border)',
+        padding: '10px 0', borderTop: '1px solid var(--border)',
     },
     pastWho: { fontSize: '0.72rem', fontWeight: 700, color: 'var(--mauve)' },
     pastAnswerText: { fontSize: '0.88rem', color: 'var(--text)', lineHeight: 1.5 },

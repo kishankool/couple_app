@@ -69,5 +69,41 @@ service cloud.firestore {
     match /date_ideas/{docId} {
       allow read, write: if true;
     }
+
+    match /couple_answers/{docId} {
+      allow read, write: if true;
+    }
+
+    match /good_morning/{docId} {
+      allow read, write: if true;
+    }
+
+    match /miss_you/{docId} {
+      allow read, write: if true;
+    }
+
+    match /hugs_kisses/{docId} {
+      allow read, write: if true;
+    }
+
+    match /photos/{docId} {
+      allow read, write: if true;
+    }
+
+    match /locations/{docId} {
+      allow read, write: if true;
+    }
+
+    match /love_jar/{docId} {
+      allow read, write: if true;
+    }
+
+    match /wish_list/{docId} {
+      allow read, write: if true;
+    }
+
+    match /push_subscriptions/{docId} {
+      allow read, write: if true;
+    }
   }
 }

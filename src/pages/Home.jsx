@@ -9,6 +9,28 @@ import { doc, getDoc, setDoc, increment } from 'firebase/firestore'
 import { WhoContext, ToastContext, RoleContext } from '../App'
 import { notifyPartner } from '../push'
 
+// Compute streak: count consecutive days (going backward from yesterday)
+async function computeStreak(fieldKey) {
+  let streak = 0
+  let date = new Date()
+  date.setDate(date.getDate() - 1) // start from yesterday
+  for (let i = 0; i < 365; i++) {
+    const key = date.toLocaleDateString('en-CA')
+    try {
+      const snap = await getDoc(doc(db, 'good_morning', key))
+      if (snap.exists() && snap.data()[fieldKey]) {
+        streak++
+        date.setDate(date.getDate() - 1)
+      } else {
+        break
+      }
+    } catch {
+      break
+    }
+  }
+  return streak
+}
+
 const ANNIVERSARY = new Date('2025-04-21T00:00:00')
 
 const QUOTES = [
@@ -109,7 +131,9 @@ export default function Home() {
   const [sendingHug, setSendingHug] = useState(false)
 
   // Good Morning / Night streak
-  const [gmData, setGmData] = useState(null) // { kishanGM, aditiGM, kishanGN, aditiGN, gmStreak, gnStreak }
+  const [gmData, setGmData] = useState(null) // { kishanGM, aditiGM, kishanGN, aditiGN }
+  const [gmStreak, setGmStreak] = useState(0)
+  const [gnStreak, setGnStreak] = useState(0)
   const [sendingGM, setSendingGM] = useState(false)
   const [sendingGN, setSendingGN] = useState(false)
 
@@ -164,14 +188,21 @@ export default function Home() {
     return () => unsubs.forEach(u => { u() })
   }, [isVisitor])
 
-  // Load Good Morning / Good Night data
+  // Load Good Morning / Good Night data + streaks
   useEffect(() => {
     if (isVisitor) return
     const ref = doc(db, 'good_morning', todayKey)
     getDoc(ref).then(snap => {
-      setGmData(snap.exists() ? snap.data() : {})
+      const data = snap.exists() ? snap.data() : {}
+      setGmData(data)
     }).catch(() => { })
-  }, [todayKey, isVisitor])
+
+    // Compute streaks in parallel
+    const gmField = `${who}GM`
+    const gnField = `${who}GN`
+    computeStreak(gmField).then(s => setGmStreak(s)).catch(() => { })
+    computeStreak(gnField).then(s => setGnStreak(s)).catch(() => { })
+  }, [todayKey, isVisitor, who])
 
   // Load Miss You counter
   useEffect(() => {
@@ -221,11 +252,14 @@ export default function Home() {
 
   const sendGoodMorning = async () => {
     if (isVisitor) return
+    if (iHaveSentGM) return showToast('Already sent today ☀️')
     setSendingGM(true)
     try {
       const ref = doc(db, 'good_morning', todayKey)
       await setDoc(ref, { [`${who}GM`]: true }, { merge: true })
       setGmData(d => ({ ...(d || {}), [`${who}GM`]: true }))
+      // Since today was sent, increment local streak by 1
+      setGmStreak(s => s + 1)
       // Push is best-effort — don't let it block or mask the write result
       notifyPartner(who, {
         title: `☀️ Good Morning from ${who}!`,
@@ -242,11 +276,14 @@ export default function Home() {
 
   const sendGoodNight = async () => {
     if (isVisitor) return
+    if (iHaveSentGN) return showToast('Already sent tonight 🌙')
     setSendingGN(true)
     try {
       const ref = doc(db, 'good_morning', todayKey)
       await setDoc(ref, { [`${who}GN`]: true }, { merge: true })
       setGmData(d => ({ ...(d || {}), [`${who}GN`]: true }))
+      // Since today was sent, increment local streak by 1
+      setGnStreak(s => s + 1)
       // Push is best-effort — don't let it block or mask the write result
       notifyPartner(who, {
         title: `🌙 Good Night from ${who}!`,
@@ -402,6 +439,22 @@ export default function Home() {
       {!isVisitor && (
         <Card>
           <CardTitle icon="☀️">Daily Greetings</CardTitle>
+
+          {/* Streak badges */}
+          <div style={styles.streakRow}>
+            <div style={styles.streakBadge}>
+              <span style={styles.streakIcon}>☀️</span>
+              <span style={styles.streakNum}>{gmStreak + (iHaveSentGM ? 1 : 0)}</span>
+              <span style={styles.streakLabel}>day streak</span>
+            </div>
+            <div style={styles.streakDivider} />
+            <div style={styles.streakBadge}>
+              <span style={styles.streakIcon}>🌙</span>
+              <span style={styles.streakNum}>{gnStreak + (iHaveSentGN ? 1 : 0)}</span>
+              <span style={styles.streakLabel}>day streak</span>
+            </div>
+          </div>
+
           <div style={styles.gmGrid}>
             <button
               style={{
@@ -409,7 +462,7 @@ export default function Home() {
                 ...(iHaveSentGM ? styles.gmBtnSent : {}),
               }}
               onClick={sendGoodMorning}
-              disabled={sendingGM}
+              disabled={sendingGM || iHaveSentGM}
             >
               <span style={{ fontSize: '1.5rem' }}>☀️</span>
               <span style={styles.gmLabel}>
@@ -427,7 +480,7 @@ export default function Home() {
                 ...(iHaveSentGN ? styles.gmBtnSent : {}),
               }}
               onClick={sendGoodNight}
-              disabled={sendingGN}
+              disabled={sendingGN || iHaveSentGN}
             >
               <span style={{ fontSize: '1.5rem' }}>🌙</span>
               <span style={styles.gmLabel}>
@@ -577,6 +630,25 @@ const styles = {
   missItem: { fontSize: '0.78rem', color: 'var(--text-light)', background: 'var(--petal)', padding: '4px 12px', borderRadius: 20 },
 
   // Good Morning/Night
+  streakRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: 0, marginBottom: 12,
+    background: 'linear-gradient(135deg, #fdf0f5, #f5e8ee)',
+    borderRadius: 14, padding: '10px 16px',
+    border: '1px solid var(--border)',
+  },
+  streakBadge: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: 1,
+  },
+  streakIcon: { fontSize: '1.2rem' },
+  streakNum: {
+    fontFamily: "'Playfair Display', serif",
+    fontSize: '1.5rem', fontWeight: 700,
+    color: 'var(--mauve-deep)', lineHeight: 1,
+  },
+  streakLabel: { fontSize: '0.62rem', color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: 1 },
+  streakDivider: { width: 1, height: 36, background: 'var(--border)', margin: '0 16px' },
+
   gmGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
   gmBtn: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
@@ -591,6 +663,8 @@ const styles = {
     background: 'linear-gradient(135deg, var(--mauve-deep), var(--mauve))',
     borderColor: 'transparent',
     color: 'white',
+    cursor: 'not-allowed',
+    opacity: 0.85,
   },
   gmLabel: { fontSize: '0.8rem', fontWeight: 700, color: 'inherit' },
   gmPartnerBadge: {

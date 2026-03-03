@@ -300,7 +300,7 @@ textarea { resize: vertical; min-height: 80px; }
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 10px var(--shadow);
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   position: relative;
 }
 .tl-dot-active {
@@ -356,7 +356,7 @@ textarea { resize: vertical; min-height: 80px; }
 /* ── Memory Card ── */
 .tl-card {
   width: calc(50% - 42px);
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }

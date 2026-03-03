@@ -351,11 +351,11 @@ export default function Home() {
   const ownerStats = [
     ['📸', stats.memories, 'Memories', '/memories'],
     ['✅', `${stats.done}/${stats.todos}`, 'Todos Done', '/todos'],
-    ['☀️', time.days, 'Days Together', '/more'],
+    ['☀️', time.days, 'Days Together', '/calendar'],
   ]
   const publicStats = [
     ['📸', stats.memories, 'Memories', '/memories'],
-    ['☀️', time.days, 'Days Together', '/'],
+    ['☀️', time.days, 'Days Together', '/calendar'],
     ['🌹', 2, 'In Love', '/more'],
   ]
 

@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { fsListen, db } from '../firebase'
 import {
     collection, addDoc, serverTimestamp, query,
-    orderBy, onSnapshot, updateDoc, doc, limit
+    orderBy, onSnapshot, updateDoc, doc, limit,
+    startAfter, getDocs, limitToLast
 } from 'firebase/firestore'
 import { WhoContext, ToastContext, RoleContext } from '../App'
 import { notifyPartner } from '../push'
@@ -37,14 +38,18 @@ export default function LoveChat() {
     const [text, setText] = useState('')
     const [sending, setSending] = useState(false)
     const [reacting, setReacting] = useState(null)  // message id showing picker
+    const [visibleCount, setVisibleCount] = useState(MESSAGES_PER_PAGE)
     const bottomRef = useRef(null)
     const inputRef = useRef(null)
+    const listRef = useRef(null)
 
-    // Real-time listener — cap Firestore reads at 200; paginate locally
+    // Real-time listener — fetch latest 200 messages, display in chronological order
     useEffect(() => {
-        const q = query(collection(db, 'love_chat'), orderBy('createdAt', 'asc'), limit(200))
+        const q = query(collection(db, 'love_chat'), orderBy('createdAt', 'desc'), limit(200))
         const unsub = onSnapshot(q, snap => {
-            setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+            docs.reverse()  // show oldest-first in UI
+            setMessages(docs)
         }, err => console.warn('Chat listener error:', err))
         return unsub
     }, [])
@@ -87,6 +92,17 @@ export default function LoveChat() {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
     }
 
+    // Load older messages: preserve scroll position
+    const loadOlder = () => {
+        const el = listRef.current
+        const prevH = el ? el.scrollHeight : 0
+        setVisibleCount(c => c + MESSAGES_PER_PAGE)
+        // after React re-renders, restore scroll so user doesn't jump
+        requestAnimationFrame(() => {
+            if (el) el.scrollTop = el.scrollHeight - prevH
+        })
+    }
+
     // Group messages by date — show only the last visibleCount
     const visibleMessages = messages.slice(-visibleCount)
     const hasOlder = messages.length > visibleCount
@@ -107,12 +123,12 @@ export default function LoveChat() {
             </div>
 
             {/* Messages list */}
-            <div style={S.msgList}>
+            <div ref={listRef} style={S.msgList}>
                 {/* Load older button */}
                 {hasOlder && (
                     <button
                         style={S.loadOlderBtn}
-                        onClick={() => setVisibleCount(c => c + MESSAGES_PER_PAGE)}
+                        onClick={loadOlder}
                     >
                         ⬆ Load older messages ({messages.length - visibleCount} more)
                     </button>

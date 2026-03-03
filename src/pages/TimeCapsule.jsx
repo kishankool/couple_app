@@ -18,11 +18,11 @@ function LockIcon() {
 }
 
 function daysUntil(dateStr) {
-    const target = new Date(dateStr)
+    const target = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T12:00:00')
     const now = new Date()
     target.setHours(0, 0, 0, 0)
     now.setHours(0, 0, 0, 0)
-    return Math.ceil((target - now) / 86400000)
+    return Math.round((target - now) / 86400000)
 }
 
 function isUnlocked(dateStr) {

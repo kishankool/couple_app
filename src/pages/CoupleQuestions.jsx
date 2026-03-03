@@ -31,15 +31,21 @@ const QUESTIONS = [
     { q: "If we wrote a book about us, what would the title be?", icon: "📖" },
 ]
 
-// Get today's question index (changes daily)
+const ALLOWED_WHO = new Set(['Kishan', 'Aditi'])
+
+// Derive today's index from the same local-date basis as getTodayKey()
+// so the question shown always matches the document key used for storage.
 function getTodayIdx() {
+    const todayKey = getTodayKey() // YYYY-MM-DD local
+    const epoch = '2025-01-01'
+    // Days between epoch and today, both in local time
     const msPerDay = 86400000
-    const epoch = new Date('2025-01-01').getTime()
-    return Math.floor((Date.now() - epoch) / msPerDay) % QUESTIONS.length
+    const diffMs = new Date(todayKey + 'T00:00:00').getTime() - new Date(epoch + 'T00:00:00').getTime()
+    return Math.floor(diffMs / msPerDay) % QUESTIONS.length
 }
 
 function getTodayKey() {
-    return new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
+    return new Date().toLocaleDateString('en-CA') // YYYY-MM-DD local
 }
 
 export default function CoupleQuestions() {
@@ -62,10 +68,20 @@ export default function CoupleQuestions() {
     // ── Real-time listener on the couple_answers/<todayKey> doc ──
     // Structure: { Kishan: { answer, date }, Aditi: { answer, date } }
     useEffect(() => {
+        // Clear draft on identity/day change (prevents Kishan's text leaking to Aditi)
+        setMyAnswer('')
+
         // Today's answers
         const todayRef = doc(db, 'couple_answers', todayKey)
         const unsubToday = onSnapshot(todayRef, snap => {
             const data = snap.exists() ? snap.data() : {}
+
+            // Guard: only proceed with known identities
+            if (!ALLOWED_WHO.has(who)) {
+                console.warn('CoupleQuestions: unexpected who value:', who)
+                return
+            }
+
             const mine = data[who]
             const partner = data[who === 'Kishan' ? 'Aditi' : 'Kishan']
             if (mine?.answer) {
@@ -77,7 +93,6 @@ export default function CoupleQuestions() {
                 // No answer from me yet — reset stale state
                 setSavedAnswer('')
                 setSubmitted(false)
-                // Don't clear myAnswer — preserve what the user may have typed
             }
             setPartnerAnswer(partner?.answer || null)
         }, err => {
@@ -117,6 +132,7 @@ export default function CoupleQuestions() {
         const trimmed = myAnswer.trim()
         if (!trimmed) return showToast('Write an answer first 💕')
         if (isVisitor) return showToast('Only Kishan & Aditi can answer 🔒')
+        if (!ALLOWED_WHO.has(who)) return showToast('Unknown user — please reload')
         if (trimmed === savedAnswer) return showToast('No changes to save ✓')
         setSaving(true)
         try {

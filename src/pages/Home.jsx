@@ -207,19 +207,25 @@ export default function Home() {
   // Load Good Morning / Good Night data + streaks
   useEffect(() => {
     if (isVisitor) return
+    let isActive = true // guard against stale promises after dep change
+
     // Load today's GM/GN flags
     const ref = doc(db, 'good_morning', todayKey)
     getDoc(ref).then(snap => {
-      setGmData(snap.exists() ? snap.data() : {})
+      if (isActive) setGmData(snap.exists() ? snap.data() : {})
     }).catch(() => { })
 
     // One batched read for both streaks
     computeStreaks(`${who}GM`, `${who}GN`)
       .then(({ gmStreak, gnStreak }) => {
-        setGmStreak(gmStreak)
-        setGnStreak(gnStreak)
+        if (isActive) {
+          setGmStreak(gmStreak)
+          setGnStreak(gnStreak)
+        }
       })
       .catch(() => { })
+
+    return () => { isActive = false }
   }, [todayKey, isVisitor, who])
 
   // Load Miss You counter

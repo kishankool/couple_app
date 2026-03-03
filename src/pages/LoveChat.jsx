@@ -164,7 +164,7 @@ export default function LoveChat() {
                                     <div style={S.avatar}>{isMsgKishan ? '💙' : '🌸'}</div>
                                 )}
 
-                                <div style={{ maxWidth: '72%' }}>
+                                <div style={{ maxWidth: '72%', position: 'relative' }}>
                                     {/* Bubble */}
                                     <div
                                         style={{

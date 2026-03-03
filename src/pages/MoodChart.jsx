@@ -71,13 +71,14 @@ export default function MoodChart() {
     const [range, setRange] = useState('7d')  // '7d' | '30d' | 'all'
 
     useEffect(() => {
+        if (isVisitor) return () => { }  // skip listener for visitors
         const unsub = fsListen('moods', (data) => {
             // Sort descending so [0] is always the most recent entry
             const sorted = [...data].sort((a, b) => new Date(b.date) - new Date(a.date))
             setMoods(sorted)
         })
         return unsub
-    }, [])
+    }, [isVisitor])
 
     if (isVisitor) {
         return (
@@ -112,7 +113,7 @@ export default function MoodChart() {
 
     // Sentiment breakdown
     const sentimentCount = { positive: 0, negative: 0, neutral: 0 }
-    filtered.forEach(m => sentimentCount[moodSentiment(m.emoji)]++)
+    filtered.forEach(m => { sentimentCount[moodSentiment(m.emoji)]++ })
     const totalSentiment = filtered.length || 1
     const sentimentPct = {
         positive: Math.round(sentimentCount.positive / totalSentiment * 100),

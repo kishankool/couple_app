@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Button from '../components/Button'
 import { db } from '../firebase'
 import {
-    doc, setDoc, collection, query, onSnapshot, serverTimestamp,
+    doc, setDoc, collection, query, onSnapshot, serverTimestamp, orderBy, limit,
 } from 'firebase/firestore'
 import { WhoContext, ToastContext, RoleContext } from '../App'
 import { notifyPartner } from '../push'
@@ -73,14 +73,23 @@ export default function CoupleQuestions() {
                 setSubmitted(true)
                 // Pre-fill textarea only on first load (don't overwrite edits)
                 setMyAnswer(prev => prev || mine.answer)
+            } else {
+                // No answer from me yet — reset stale state
+                setSavedAnswer('')
+                setSubmitted(false)
+                // Don't clear myAnswer — preserve what the user may have typed
             }
             setPartnerAnswer(partner?.answer || null)
         }, err => {
             console.warn('couple_answers today listener error:', err)
         })
 
-        // Past answers — listen to the whole collection except today
-        const pastQ = query(collection(db, 'couple_answers'))
+        // Past answers — bounded query: 20 most-recently-updated docs, client-side filter today
+        const pastQ = query(
+            collection(db, 'couple_answers'),
+            orderBy('updatedAt', 'desc'),
+            limit(20)
+        )
         const unsubPast = onSnapshot(pastQ, snap => {
             const groups = []
             snap.docs.forEach(d => {

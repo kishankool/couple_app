@@ -94,15 +94,15 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    match /love_jar/{docId} {
+    match /love_reasons/{docId} {
       allow read, write: if true;
     }
 
-    match /wish_list/{docId} {
+    match /wishlist/{docId} {
       allow read, write: if true;
     }
 
-    match /push_subscriptions/{docId} {
+    match /push_subs/{docId} {
       allow read, write: if true;
     }
   }

@@ -5,30 +5,46 @@ import Card, { CardTitle } from '../components/Card'
 import Button from '../components/Button'
 import Confetti from '../components/Confetti'
 import { fsAdd, fsListen, fsSet, db } from '../firebase'
-import { doc, getDoc, setDoc, increment } from 'firebase/firestore'
+import { doc, getDoc, setDoc, increment, getDocs, query, collection, orderBy, limit } from 'firebase/firestore'
 import { WhoContext, ToastContext, RoleContext } from '../App'
 import { notifyPartner } from '../push'
 
-// Compute streak: count consecutive days (going backward from yesterday)
-async function computeStreak(fieldKey) {
-  let streak = 0
-  let date = new Date()
+// Compute both GM and GN streaks in one batched read.
+// Documents are keyed YYYY-MM-DD so ordering by __name__ desc gives newest-first.
+async function computeStreaks(gmField, gnField) {
+  const q = query(
+    collection(db, 'good_morning'),
+    orderBy('__name__', 'desc'),
+    limit(365)
+  )
+  const snap = await getDocs(q)
+  const docs = snap.docs // already newest → oldest
+
+  // Build a map of dateKey → data for fast lookup
+  const byKey = {}
+  docs.forEach(d => { byKey[d.id] = d.data() })
+
+  // Walk backward from yesterday counting consecutive days
+  let gmStreak = 0, gnStreak = 0
+  let gmBroken = false, gnBroken = false
+  const date = new Date()
   date.setDate(date.getDate() - 1) // start from yesterday
+
   for (let i = 0; i < 365; i++) {
     const key = date.toLocaleDateString('en-CA')
-    try {
-      const snap = await getDoc(doc(db, 'good_morning', key))
-      if (snap.exists() && snap.data()[fieldKey]) {
-        streak++
-        date.setDate(date.getDate() - 1)
-      } else {
-        break
-      }
-    } catch {
-      break
+    const data = byKey[key]
+    if (!gmBroken) {
+      if (data?.[gmField]) gmStreak++
+      else gmBroken = true
     }
+    if (!gnBroken) {
+      if (data?.[gnField]) gnStreak++
+      else gnBroken = true
+    }
+    if (gmBroken && gnBroken) break
+    date.setDate(date.getDate() - 1)
   }
-  return streak
+  return { gmStreak, gnStreak }
 }
 
 const ANNIVERSARY = new Date('2025-04-21T00:00:00')
@@ -191,17 +207,19 @@ export default function Home() {
   // Load Good Morning / Good Night data + streaks
   useEffect(() => {
     if (isVisitor) return
+    // Load today's GM/GN flags
     const ref = doc(db, 'good_morning', todayKey)
     getDoc(ref).then(snap => {
-      const data = snap.exists() ? snap.data() : {}
-      setGmData(data)
+      setGmData(snap.exists() ? snap.data() : {})
     }).catch(() => { })
 
-    // Compute streaks in parallel
-    const gmField = `${who}GM`
-    const gnField = `${who}GN`
-    computeStreak(gmField).then(s => setGmStreak(s)).catch(() => { })
-    computeStreak(gnField).then(s => setGnStreak(s)).catch(() => { })
+    // One batched read for both streaks
+    computeStreaks(`${who}GM`, `${who}GN`)
+      .then(({ gmStreak, gnStreak }) => {
+        setGmStreak(gmStreak)
+        setGnStreak(gnStreak)
+      })
+      .catch(() => { })
   }, [todayKey, isVisitor, who])
 
   // Load Miss You counter
@@ -258,8 +276,7 @@ export default function Home() {
       const ref = doc(db, 'good_morning', todayKey)
       await setDoc(ref, { [`${who}GM`]: true }, { merge: true })
       setGmData(d => ({ ...(d || {}), [`${who}GM`]: true }))
-      // Since today was sent, increment local streak by 1
-      setGmStreak(s => s + 1)
+      // Streak display auto-updates via iHaveSentGM (+1 in render)
       // Push is best-effort — don't let it block or mask the write result
       notifyPartner(who, {
         title: `☀️ Good Morning from ${who}!`,
@@ -282,8 +299,7 @@ export default function Home() {
       const ref = doc(db, 'good_morning', todayKey)
       await setDoc(ref, { [`${who}GN`]: true }, { merge: true })
       setGmData(d => ({ ...(d || {}), [`${who}GN`]: true }))
-      // Since today was sent, increment local streak by 1
-      setGnStreak(s => s + 1)
+      // Streak display auto-updates via iHaveSentGN (+1 in render)
       // Push is best-effort — don't let it block or mask the write result
       notifyPartner(who, {
         title: `🌙 Good Night from ${who}!`,

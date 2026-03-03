@@ -2,14 +2,16 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import Home from './pages/Home'
-import Notes from './pages/Notes'
 import Memories from './pages/Memories'
-import Updates from './pages/Updates'
 import Todos from './pages/Todos'
 import More from './pages/More'
 import LoveJar from './pages/LoveJar'
 import CoupleQuestions from './pages/CoupleQuestions'
 import Wishlist from './pages/Wishlist'
+import Calendar from './pages/Calendar'
+import TimeCapsule from './pages/TimeCapsule'
+import LoveChat from './pages/LoveChat'
+import MoodChart from './pages/MoodChart'
 import Petals from './components/Petals'
 import Toast from './components/Toast'
 import Modal from './components/Modal'
@@ -21,10 +23,9 @@ export const RoleContext = React.createContext({ isVisitor: false })
 
 const NAV_ALL = [
   { path: '/', icon: '🏠', label: 'Home' },
-  { path: '/notes', icon: '💌', label: 'Notes', private: true },
   { path: '/memories', icon: '📸', label: 'Memories' },
-  { path: '/updates', icon: '🤳', label: 'Updates', private: true },
-  { path: '/todos', icon: '✅', label: 'Todos', private: true },
+  { path: '/chat', icon: '💬', label: 'Chat', private: true },
+  { path: '/calendar', icon: '📅', label: 'Calendar', private: true },
   { path: '/more', icon: '🌹', label: 'More' },
 ]
 
@@ -206,9 +207,11 @@ export default function App() {
               <AnimatePresence mode="wait">
                 <Routes location={location} key={location.pathname}>
                   <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
-                  <Route path="/notes" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Notes /></PageWrapper>} />
                   <Route path="/memories" element={<PageWrapper><Memories /></PageWrapper>} />
-                  <Route path="/updates" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Updates /></PageWrapper>} />
+                  <Route path="/chat" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><LoveChat /></PageWrapper>} />
+                  <Route path="/calendar" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Calendar /></PageWrapper>} />
+                  <Route path="/capsule" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><TimeCapsule /></PageWrapper>} />
+                  <Route path="/moodchart" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><MoodChart /></PageWrapper>} />
                   <Route path="/todos" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Todos /></PageWrapper>} />
                   <Route path="/more" element={<PageWrapper><More /></PageWrapper>} />
                   <Route path="/love-jar" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><LoveJar /></PageWrapper>} />

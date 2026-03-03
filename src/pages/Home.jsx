@@ -198,7 +198,6 @@ export default function Home() {
     const u2 = fsListen('memories', d => setStats(s => ({ ...s, memories: d.length })))
     const unsubs = [u2]
     if (!isVisitor) {
-      unsubs.push(fsListen('notes', d => setStats(s => ({ ...s, notes: d.length }))))
       unsubs.push(fsListen('todos', d => setStats(s => ({ ...s, todos: d.length, done: d.filter(t => t.done).length }))))
     }
     return () => unsubs.forEach(u => { u() })
@@ -350,13 +349,13 @@ export default function Home() {
   const partnerSentGN = gmData?.[`${who === 'Kishan' ? 'Aditi' : 'Kishan'}GN`]
 
   const ownerStats = [
-    ['💌', stats.notes, 'Love Notes', '/notes'],
     ['📸', stats.memories, 'Memories', '/memories'],
     ['✅', `${stats.done}/${stats.todos}`, 'Todos Done', '/todos'],
+    ['☀️', time.days, 'Days Together', '/calendar'],
   ]
   const publicStats = [
     ['📸', stats.memories, 'Memories', '/memories'],
-    ['☀️', time.days, 'Days Together', '/'],
+    ['☀️', time.days, 'Days Together', '/more'],
     ['🌹', 2, 'In Love', '/more'],
   ]
 
@@ -549,8 +548,11 @@ export default function Home() {
         <div style={styles.quickNavGrid}>
           {[
             { icon: '💝', label: 'Love Jar', path: '/love-jar', bg: 'linear-gradient(135deg, #fde8ef, #f5dde0)' },
-            { icon: '💬', label: 'Questions', path: '/questions', bg: 'linear-gradient(135deg, #e8effe, #dde8fe)' },
+            { icon: '💬', label: 'Couple Q', path: '/questions', bg: 'linear-gradient(135deg, #e8effe, #dde8fe)' },
             { icon: '🎁', label: 'Wishlist', path: '/wishlist', bg: 'linear-gradient(135deg, #e8fde8, #d4f0d4)' },
+            { icon: '💌', label: 'Capsule', path: '/capsule', bg: 'linear-gradient(135deg, #fde8ef, #f9dde8)' },
+            { icon: '📊', label: 'Mood Chart', path: '/moodchart', bg: 'linear-gradient(135deg, #f3e8fd, #e8daef)' },
+            { icon: '✅', label: 'Todos', path: '/todos', bg: 'linear-gradient(135deg, #e8f5e9, #d4f0d4)' },
           ].map(item => (
             <motion.button
               key={item.path}

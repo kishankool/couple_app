@@ -105,5 +105,20 @@ service cloud.firestore {
     match /push_subs/{docId} {
       allow read, write: if true;
     }
+
+    match /cal_events/{docId} {
+      allow read: if true;
+      allow write: if true;  // No Firebase Auth in this app — lock screen protects client-side
+    }
+
+    match /time_capsules/{docId} {
+      allow read: if true;
+      allow write: if true;  // No Firebase Auth in this app — lock screen protects client-side
+    }
+
+    match /love_chat/{docId} {
+      allow read: if true;
+      allow write: if true;  // No Firebase Auth in this app — lock screen protects client-side
+    }
   }
 }

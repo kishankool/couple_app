@@ -29,7 +29,6 @@ const MORE_TABS = [
   { key: 'ideas', icon: '🌹', label: 'Date Ideas' },
   { key: 'countdowns', icon: '🎉', label: 'Countdowns' },
   { key: 'stats', icon: '📊', label: 'Stats' },
-  { key: 'moods', icon: '🌙', label: 'Moods' },
 ]
 
 function liveCountdown(dateStr) {
@@ -92,7 +91,6 @@ export default function More() {
 
   const [ideas, setIdeas] = useState([])
   const [events, setEvents] = useState([])
-  const [moods, setMoods] = useState([])
 
   // Ref for the date-randomizer interval so it can be cleared on unmount
   const intervalRef = useRef(null)
@@ -118,8 +116,7 @@ export default function More() {
   useEffect(() => {
     const u1 = fsListen('date_ideas', d => setIdeas(d))
     const u2 = fsListen('events', d => setEvents(d))
-    const u3 = fsListen('moods', d => setMoods(d))
-    return () => { u1(); u2(); u3() }
+    return () => { u1(); u2() }
   }, [])
 
   // Save date idea
@@ -242,8 +239,7 @@ export default function More() {
             <span className="tab-count">
               {tab.key === 'ideas' ? allIdeas.length
                 : tab.key === 'countdowns' ? events.length
-                  : tab.key === 'moods' ? moods.length
-                    : '∞'}
+                  : '∞'}
             </span>
           </button>
         ))}
@@ -324,10 +320,20 @@ export default function More() {
       {activeTab === 'countdowns' && (
         <div style={{ animation: 'fadeUp 0.25s ease' }}>
           <Card>
-            <CardTitle icon="🎉">Countdowns</CardTitle>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <CardTitle icon="🎉">Countdowns</CardTitle>
+              {!isVisitor && (
+                <button style={S.addCdBtn} onClick={() => setEventOpen(true)}>+ Add</button>
+              )}
+            </div>
             {sortedEvents.length === 0 ? (
               <div className="empty-state" style={{ padding: 16 }}>
-                No countdowns yet! Add your next special event 🎉
+                <div style={{ marginBottom: 8 }}>No countdowns yet!</div>
+                {!isVisitor && (
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-light)' }}>
+                    Tap <strong>+ Add</strong> above to add your next special event 🎉
+                  </div>
+                )}
               </div>
             ) : sortedEvents.map((e, i) => {
               const cd = liveCountdown(e.date)
@@ -335,12 +341,14 @@ export default function More() {
                 <div key={e.id} style={{ ...S.eventCard, opacity: cd.past ? 0.55 : 1, animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                     <div style={S.eventName}>{e.name}</div>
-                    <button
-                      type="button"
-                      style={S.delBtn}
-                      aria-label={`Delete countdown: ${e.name}`}
-                      onClick={() => fsDelete('events', e.id).then(() => showToast('Removed')).catch(() => showToast('Error'))}
-                    >🗑</button>
+                    {!isVisitor && (
+                      <button
+                        type="button"
+                        style={S.delBtn}
+                        aria-label={`Delete countdown: ${e.name}`}
+                        onClick={() => fsDelete('events', e.id).then(() => showToast('Removed')).catch(() => showToast('Error'))}
+                      >🗑</button>
+                    )}
                   </div>
                   <div style={{ ...S.eventCountdown, color: cd.past ? 'var(--text-light)' : 'var(--rose-dark)' }}>
                     {cd.past ? cd.text : `In ${cd.text} ⏳`}
@@ -364,32 +372,6 @@ export default function More() {
           <Card>
             <CardTitle icon="📊">Relationship Stats</CardTitle>
             <RelStats />
-          </Card>
-        </div>
-      )}
-
-      {/* ── Moods Tab ── */}
-      {activeTab === 'moods' && (
-        <div style={{ animation: 'fadeUp 0.25s ease' }}>
-          <Card>
-            <CardTitle icon="🌙">Mood History</CardTitle>
-            {moods.length === 0 ? (
-              <div className="empty-state" style={{ padding: 16 }}>No moods logged yet!</div>
-            ) : moods.map((m, i) => (
-              <div key={`mood-${i}`} style={{ ...S.moodRow, animationDelay: `${Math.min(i * 0.03, 0.5)}s` }}>
-                <span style={{ fontSize: '1.5rem' }}>{m.emoji}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={S.moodWho}>
-                    {m.who === 'Kishan' ? '💙' : '🌸'} {m.who}
-                  </div>
-                  <div style={S.moodWhen}>
-                    {m.date
-                      ? new Date(m.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                      : ''}
-                  </div>
-                </div>
-              </div>
-            ))}
           </Card>
         </div>
       )}
@@ -539,6 +521,13 @@ const S = {
     transition: 'color 0.2s',
     WebkitTapHighlightColor: 'transparent',
   },
+  addCdBtn: {
+    background: 'linear-gradient(135deg, var(--mauve-deep), var(--mauve))',
+    color: 'white', border: 'none', borderRadius: 20,
+    padding: '6px 16px', fontSize: '0.8rem', fontWeight: 700,
+    cursor: 'pointer', fontFamily: 'Lato, sans-serif',
+    WebkitTapHighlightColor: 'transparent', letterSpacing: 0.3,
+  },
   eventCard: {
     background: 'linear-gradient(135deg, #ffffff, var(--petal))',
     borderRadius: 16, padding: '16px 16px 14px', marginBottom: 10,
@@ -566,11 +555,4 @@ const S = {
     fontFamily: "'Playfair Display', serif",
     fontSize: '0.98rem', color: 'var(--mauve-deep)', fontWeight: 700,
   },
-  moodRow: {
-    display: 'flex', alignItems: 'center', gap: 12,
-    padding: '10px 0', borderBottom: '1px solid var(--border)',
-    animation: 'fadeUp 0.3s ease both',
-  },
-  moodWho: { fontWeight: 700, fontSize: '0.88rem', color: 'var(--mauve-deep)' },
-  moodWhen: { fontSize: '0.74rem', color: 'var(--text-light)', marginTop: 2 },
 }

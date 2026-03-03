@@ -125,6 +125,7 @@ export default function Calendar() {
   }
 
   const del = async (id) => {
+    if (isVisitor) return showToast('Not allowed 🔒')
     try { await fsDelete('cal_events', id); showToast('Removed') }
     catch { showToast('Error') }
   }
@@ -263,7 +264,7 @@ export default function Calendar() {
                 </div>
               </div>
               {!isVisitor && (
-                <button style={S.delBtn} onClick={() => { del(e.id); if (dayEvents.length <= 1) setDayOpen(false) }}>🗑</button>
+                <button style={S.delBtn} onClick={async () => { await del(e.id); if (dayEvents.length <= 1) setDayOpen(false) }}>🗑</button>
               )}
             </div>
           )

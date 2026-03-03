@@ -140,15 +140,9 @@ export default function MoodChart() {
 
     // Mood sync (do they feel the same today?)
     const todayStr = new Date().toDateString()
-    // Sort descending so [0] is the most recent mood logged today
-    const todayKishan = moods
-        .filter(m => m.who === 'Kishan' && new Date(m.date).toDateString() === todayStr)
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
-    const todayAditi = moods
-        .filter(m => m.who === 'Aditi' && new Date(m.date).toDateString() === todayStr)
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
-    const lastKishanToday = todayKishan[0]?.emoji
-    const lastAditiToday = todayAditi[0]?.emoji
+    // moods is already sorted newest-first from the listener — just filter
+    const lastKishanToday = moods.find(m => m.who === 'Kishan' && new Date(m.date).toDateString() === todayStr)?.emoji
+    const lastAditiToday = moods.find(m => m.who === 'Aditi' && new Date(m.date).toDateString() === todayStr)?.emoji
     const inSync = lastKishanToday && lastAditiToday && moodSentiment(lastKishanToday) === moodSentiment(lastAditiToday)
 
     return (

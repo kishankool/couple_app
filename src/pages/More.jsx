@@ -555,11 +555,4 @@ const S = {
     fontFamily: "'Playfair Display', serif",
     fontSize: '0.98rem', color: 'var(--mauve-deep)', fontWeight: 700,
   },
-  moodRow: {
-    display: 'flex', alignItems: 'center', gap: 12,
-    padding: '10px 0', borderBottom: '1px solid var(--border)',
-    animation: 'fadeUp 0.3s ease both',
-  },
-  moodWho: { fontWeight: 700, fontSize: '0.88rem', color: 'var(--mauve-deep)' },
-  moodWhen: { fontSize: '0.74rem', color: 'var(--text-light)', marginTop: 2 },
 }

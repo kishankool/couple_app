@@ -320,10 +320,20 @@ export default function More() {
       {activeTab === 'countdowns' && (
         <div style={{ animation: 'fadeUp 0.25s ease' }}>
           <Card>
-            <CardTitle icon="🎉">Countdowns</CardTitle>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <CardTitle icon="🎉">Countdowns</CardTitle>
+              {!isVisitor && (
+                <button style={S.addCdBtn} onClick={() => setEventOpen(true)}>+ Add</button>
+              )}
+            </div>
             {sortedEvents.length === 0 ? (
               <div className="empty-state" style={{ padding: 16 }}>
-                No countdowns yet! Add your next special event 🎉
+                <div style={{ marginBottom: 8 }}>No countdowns yet!</div>
+                {!isVisitor && (
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-light)' }}>
+                    Tap <strong>+ Add</strong> above to add your next special event 🎉
+                  </div>
+                )}
               </div>
             ) : sortedEvents.map((e, i) => {
               const cd = liveCountdown(e.date)
@@ -331,12 +341,14 @@ export default function More() {
                 <div key={e.id} style={{ ...S.eventCard, opacity: cd.past ? 0.55 : 1, animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                     <div style={S.eventName}>{e.name}</div>
-                    <button
-                      type="button"
-                      style={S.delBtn}
-                      aria-label={`Delete countdown: ${e.name}`}
-                      onClick={() => fsDelete('events', e.id).then(() => showToast('Removed')).catch(() => showToast('Error'))}
-                    >🗑</button>
+                    {!isVisitor && (
+                      <button
+                        type="button"
+                        style={S.delBtn}
+                        aria-label={`Delete countdown: ${e.name}`}
+                        onClick={() => fsDelete('events', e.id).then(() => showToast('Removed')).catch(() => showToast('Error'))}
+                      >🗑</button>
+                    )}
                   </div>
                   <div style={{ ...S.eventCountdown, color: cd.past ? 'var(--text-light)' : 'var(--rose-dark)' }}>
                     {cd.past ? cd.text : `In ${cd.text} ⏳`}
@@ -508,6 +520,13 @@ const S = {
     color: '#ccc', cursor: 'pointer', fontSize: '0.95rem', flexShrink: 0,
     transition: 'color 0.2s',
     WebkitTapHighlightColor: 'transparent',
+  },
+  addCdBtn: {
+    background: 'linear-gradient(135deg, var(--mauve-deep), var(--mauve))',
+    color: 'white', border: 'none', borderRadius: 20,
+    padding: '6px 16px', fontSize: '0.8rem', fontWeight: 700,
+    cursor: 'pointer', fontFamily: 'Lato, sans-serif',
+    WebkitTapHighlightColor: 'transparent', letterSpacing: 0.3,
   },
   eventCard: {
     background: 'linear-gradient(135deg, #ffffff, var(--petal))',

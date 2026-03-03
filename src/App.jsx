@@ -25,7 +25,7 @@ const NAV_ALL = [
   { path: '/', icon: '🏠', label: 'Home' },
   { path: '/memories', icon: '📸', label: 'Memories' },
   { path: '/chat', icon: '💬', label: 'Chat', private: true },
-  { path: '/calendar', icon: '📅', label: 'Calendar' },
+  { path: '/calendar', icon: '📅', label: 'Calendar', private: true },
   { path: '/more', icon: '🌹', label: 'More' },
 ]
 
@@ -209,7 +209,7 @@ export default function App() {
                   <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
                   <Route path="/memories" element={<PageWrapper><Memories /></PageWrapper>} />
                   <Route path="/chat" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><LoveChat /></PageWrapper>} />
-                  <Route path="/calendar" element={<PageWrapper><Calendar /></PageWrapper>} />
+                  <Route path="/calendar" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Calendar /></PageWrapper>} />
                   <Route path="/capsule" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><TimeCapsule /></PageWrapper>} />
                   <Route path="/moodchart" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><MoodChart /></PageWrapper>} />
                   <Route path="/todos" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Todos /></PageWrapper>} />

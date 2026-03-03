@@ -355,7 +355,7 @@ export default function Home() {
   ]
   const publicStats = [
     ['📸', stats.memories, 'Memories', '/memories'],
-    ['☀️', time.days, 'Days Together', '/calendar'],
+    ['☀️', time.days, 'Days Together', '/more'],
     ['🌹', 2, 'In Love', '/more'],
   ]
 

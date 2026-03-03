@@ -71,7 +71,11 @@ export default function MoodChart() {
     const [range, setRange] = useState('7d')  // '7d' | '30d' | 'all'
 
     useEffect(() => {
-        const unsub = fsListen('moods', setMoods)
+        const unsub = fsListen('moods', (data) => {
+            // Sort descending so [0] is always the most recent entry
+            const sorted = [...data].sort((a, b) => new Date(b.date) - new Date(a.date))
+            setMoods(sorted)
+        })
         return unsub
     }, [])
 
@@ -135,8 +139,13 @@ export default function MoodChart() {
 
     // Mood sync (do they feel the same today?)
     const todayStr = new Date().toDateString()
-    const todayKishan = moods.filter(m => m.who === 'Kishan' && new Date(m.date).toDateString() === todayStr)
-    const todayAditi = moods.filter(m => m.who === 'Aditi' && new Date(m.date).toDateString() === todayStr)
+    // Sort descending so [0] is the most recent mood logged today
+    const todayKishan = moods
+        .filter(m => m.who === 'Kishan' && new Date(m.date).toDateString() === todayStr)
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+    const todayAditi = moods
+        .filter(m => m.who === 'Aditi' && new Date(m.date).toDateString() === todayStr)
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
     const lastKishanToday = todayKishan[0]?.emoji
     const lastAditiToday = todayAditi[0]?.emoji
     const inSync = lastKishanToday && lastAditiToday && moodSentiment(lastKishanToday) === moodSentiment(lastAditiToday)

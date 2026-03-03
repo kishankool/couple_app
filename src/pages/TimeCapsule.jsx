@@ -58,7 +58,7 @@ export default function TimeCapsule() {
         if (!fMessage.trim()) return showToast('Write your message first ✍️')
         if (!fOpenOn) return showToast('Pick a reveal date 📅')
         const diff = daysUntil(fOpenOn)
-        if (diff < 0) return showToast('Pick a future date!')
+        if (diff <= 0) return showToast('Pick a future date!')
         setSaving(true)
         try {
             await fsAdd('time_capsules', {

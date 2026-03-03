@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { fsListen, db } from '../firebase'
 import {
     collection, addDoc, serverTimestamp, query,
-    orderBy, onSnapshot, updateDoc, doc
+    orderBy, onSnapshot, updateDoc, doc, limit
 } from 'firebase/firestore'
 import { WhoContext, ToastContext, RoleContext } from '../App'
 import { notifyPartner } from '../push'
@@ -26,6 +26,8 @@ function formatDateGroup(ts) {
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+const MESSAGES_PER_PAGE = 40
+
 export default function LoveChat() {
     const { who } = useContext(WhoContext)
     const showToast = useContext(ToastContext)
@@ -38,9 +40,9 @@ export default function LoveChat() {
     const bottomRef = useRef(null)
     const inputRef = useRef(null)
 
-    // Real-time listener (no limit so history loads fully)
+    // Real-time listener — cap Firestore reads at 200; paginate locally
     useEffect(() => {
-        const q = query(collection(db, 'love_chat'), orderBy('createdAt', 'asc'))
+        const q = query(collection(db, 'love_chat'), orderBy('createdAt', 'asc'), limit(200))
         const unsub = onSnapshot(q, snap => {
             setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })))
         }, err => console.warn('Chat listener error:', err))
@@ -85,10 +87,12 @@ export default function LoveChat() {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
     }
 
-    // Group messages by date
+    // Group messages by date — show only the last visibleCount
+    const visibleMessages = messages.slice(-visibleCount)
+    const hasOlder = messages.length > visibleCount
     const grouped = []
     let lastDate = null
-    messages.forEach(m => {
+    visibleMessages.forEach(m => {
         const dLabel = formatDateGroup(m.createdAt)
         if (dLabel !== lastDate) { grouped.push({ type: 'divider', label: dLabel }); lastDate = dLabel }
         grouped.push({ type: 'msg', ...m })
@@ -104,6 +108,16 @@ export default function LoveChat() {
 
             {/* Messages list */}
             <div style={S.msgList}>
+                {/* Load older button */}
+                {hasOlder && (
+                    <button
+                        style={S.loadOlderBtn}
+                        onClick={() => setVisibleCount(c => c + MESSAGES_PER_PAGE)}
+                    >
+                        ⬆ Load older messages ({messages.length - visibleCount} more)
+                    </button>
+                )}
+
                 {grouped.length === 0 && (
                     <div style={S.empty}>
                         <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>💕</div>
@@ -169,7 +183,7 @@ export default function LoveChat() {
                                                 initial={{ opacity: 0, scale: 0.8, y: 4 }}
                                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                                 exit={{ opacity: 0, scale: 0.8, y: 4 }}
-                                                style={{ ...S.emojiPicker, [isMe ? 'right' : ' left']: 0 }}
+                                                style={{ ...S.emojiPicker, [isMe ? 'right' : 'left']: 0 }}
                                             >
                                                 {REACTIONS.map(em => (
                                                     <button key={em} style={S.emojiBtn} onClick={() => react(item.id, em)}>

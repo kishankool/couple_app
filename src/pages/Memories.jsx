@@ -91,11 +91,11 @@ function CurvedPathSVG({ pathRef, dotRefs, count }) {
     }
 
     measure()
-    // Re-measure on resize and after layout changes
+    // Re-measure on resize only — not after animations to avoid bumps
     const ro = new ResizeObserver(measure)
     if (pathRef.current) ro.observe(pathRef.current)
-    // Also re-measure after a short delay for animations
-    const timer = setTimeout(measure, 600)
+    // Also re-measure after layout settles (cards animate over ~400ms)
+    const timer = setTimeout(measure, 800)
     return () => { ro.disconnect(); clearTimeout(timer) }
   }, [pathRef, dotRefs, count])
 
@@ -157,9 +157,8 @@ function TimelineNode({ memory: m, index, total, isActive, onActivate, onDelete,
   const nodeRef = useRef(null)
 
   useEffect(() => {
-    if (isActive && nodeRef.current) {
-      nodeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
+    // Don't scrollIntoView — it causes the page to jump/bump
+    // The active node is visible enough from the user's tap
   }, [isActive])
 
   const del = (e) => {

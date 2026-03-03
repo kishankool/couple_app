@@ -5,9 +5,47 @@ import Card, { CardTitle } from '../components/Card'
 import Button from '../components/Button'
 import Confetti from '../components/Confetti'
 import { fsAdd, fsListen, fsSet, db } from '../firebase'
-import { doc, getDoc, setDoc, increment } from 'firebase/firestore'
+import { doc, getDoc, setDoc, increment, getDocs, query, collection, orderBy, limit } from 'firebase/firestore'
 import { WhoContext, ToastContext, RoleContext } from '../App'
 import { notifyPartner } from '../push'
+
+// Compute both GM and GN streaks in one batched read.
+// Documents are keyed YYYY-MM-DD so ordering by __name__ desc gives newest-first.
+async function computeStreaks(gmField, gnField) {
+  const q = query(
+    collection(db, 'good_morning'),
+    orderBy('__name__', 'desc'),
+    limit(365)
+  )
+  const snap = await getDocs(q)
+  const docs = snap.docs // already newest → oldest
+
+  // Build a map of dateKey → data for fast lookup
+  const byKey = {}
+  docs.forEach(d => { byKey[d.id] = d.data() })
+
+  // Walk backward from yesterday counting consecutive days
+  let gmStreak = 0, gnStreak = 0
+  let gmBroken = false, gnBroken = false
+  const date = new Date()
+  date.setDate(date.getDate() - 1) // start from yesterday
+
+  for (let i = 0; i < 365; i++) {
+    const key = date.toLocaleDateString('en-CA')
+    const data = byKey[key]
+    if (!gmBroken) {
+      if (data?.[gmField]) gmStreak++
+      else gmBroken = true
+    }
+    if (!gnBroken) {
+      if (data?.[gnField]) gnStreak++
+      else gnBroken = true
+    }
+    if (gmBroken && gnBroken) break
+    date.setDate(date.getDate() - 1)
+  }
+  return { gmStreak, gnStreak }
+}
 
 const ANNIVERSARY = new Date('2025-04-21T00:00:00')
 
@@ -109,7 +147,9 @@ export default function Home() {
   const [sendingHug, setSendingHug] = useState(false)
 
   // Good Morning / Night streak
-  const [gmData, setGmData] = useState(null) // { kishanGM, aditiGM, kishanGN, aditiGN, gmStreak, gnStreak }
+  const [gmData, setGmData] = useState(null) // { kishanGM, aditiGM, kishanGN, aditiGN }
+  const [gmStreak, setGmStreak] = useState(0)
+  const [gnStreak, setGnStreak] = useState(0)
   const [sendingGM, setSendingGM] = useState(false)
   const [sendingGN, setSendingGN] = useState(false)
 
@@ -164,14 +204,29 @@ export default function Home() {
     return () => unsubs.forEach(u => { u() })
   }, [isVisitor])
 
-  // Load Good Morning / Good Night data
+  // Load Good Morning / Good Night data + streaks
   useEffect(() => {
     if (isVisitor) return
+    let isActive = true // guard against stale promises after dep change
+
+    // Load today's GM/GN flags
     const ref = doc(db, 'good_morning', todayKey)
     getDoc(ref).then(snap => {
-      setGmData(snap.exists() ? snap.data() : {})
+      if (isActive) setGmData(snap.exists() ? snap.data() : {})
     }).catch(() => { })
-  }, [todayKey, isVisitor])
+
+    // One batched read for both streaks
+    computeStreaks(`${who}GM`, `${who}GN`)
+      .then(({ gmStreak, gnStreak }) => {
+        if (isActive) {
+          setGmStreak(gmStreak)
+          setGnStreak(gnStreak)
+        }
+      })
+      .catch(() => { })
+
+    return () => { isActive = false }
+  }, [todayKey, isVisitor, who])
 
   // Load Miss You counter
   useEffect(() => {
@@ -221,11 +276,13 @@ export default function Home() {
 
   const sendGoodMorning = async () => {
     if (isVisitor) return
+    if (iHaveSentGM) return showToast('Already sent today ☀️')
     setSendingGM(true)
     try {
       const ref = doc(db, 'good_morning', todayKey)
       await setDoc(ref, { [`${who}GM`]: true }, { merge: true })
       setGmData(d => ({ ...(d || {}), [`${who}GM`]: true }))
+      // Streak display auto-updates via iHaveSentGM (+1 in render)
       // Push is best-effort — don't let it block or mask the write result
       notifyPartner(who, {
         title: `☀️ Good Morning from ${who}!`,
@@ -242,11 +299,13 @@ export default function Home() {
 
   const sendGoodNight = async () => {
     if (isVisitor) return
+    if (iHaveSentGN) return showToast('Already sent tonight 🌙')
     setSendingGN(true)
     try {
       const ref = doc(db, 'good_morning', todayKey)
       await setDoc(ref, { [`${who}GN`]: true }, { merge: true })
       setGmData(d => ({ ...(d || {}), [`${who}GN`]: true }))
+      // Streak display auto-updates via iHaveSentGN (+1 in render)
       // Push is best-effort — don't let it block or mask the write result
       notifyPartner(who, {
         title: `🌙 Good Night from ${who}!`,
@@ -402,6 +461,22 @@ export default function Home() {
       {!isVisitor && (
         <Card>
           <CardTitle icon="☀️">Daily Greetings</CardTitle>
+
+          {/* Streak badges */}
+          <div style={styles.streakRow}>
+            <div style={styles.streakBadge}>
+              <span style={styles.streakIcon}>☀️</span>
+              <span style={styles.streakNum}>{gmStreak + (iHaveSentGM ? 1 : 0)}</span>
+              <span style={styles.streakLabel}>day streak</span>
+            </div>
+            <div style={styles.streakDivider} />
+            <div style={styles.streakBadge}>
+              <span style={styles.streakIcon}>🌙</span>
+              <span style={styles.streakNum}>{gnStreak + (iHaveSentGN ? 1 : 0)}</span>
+              <span style={styles.streakLabel}>day streak</span>
+            </div>
+          </div>
+
           <div style={styles.gmGrid}>
             <button
               style={{
@@ -409,7 +484,7 @@ export default function Home() {
                 ...(iHaveSentGM ? styles.gmBtnSent : {}),
               }}
               onClick={sendGoodMorning}
-              disabled={sendingGM}
+              disabled={sendingGM || iHaveSentGM}
             >
               <span style={{ fontSize: '1.5rem' }}>☀️</span>
               <span style={styles.gmLabel}>
@@ -427,7 +502,7 @@ export default function Home() {
                 ...(iHaveSentGN ? styles.gmBtnSent : {}),
               }}
               onClick={sendGoodNight}
-              disabled={sendingGN}
+              disabled={sendingGN || iHaveSentGN}
             >
               <span style={{ fontSize: '1.5rem' }}>🌙</span>
               <span style={styles.gmLabel}>
@@ -577,6 +652,25 @@ const styles = {
   missItem: { fontSize: '0.78rem', color: 'var(--text-light)', background: 'var(--petal)', padding: '4px 12px', borderRadius: 20 },
 
   // Good Morning/Night
+  streakRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: 0, marginBottom: 12,
+    background: 'linear-gradient(135deg, #fdf0f5, #f5e8ee)',
+    borderRadius: 14, padding: '10px 16px',
+    border: '1px solid var(--border)',
+  },
+  streakBadge: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: 1,
+  },
+  streakIcon: { fontSize: '1.2rem' },
+  streakNum: {
+    fontFamily: "'Playfair Display', serif",
+    fontSize: '1.5rem', fontWeight: 700,
+    color: 'var(--mauve-deep)', lineHeight: 1,
+  },
+  streakLabel: { fontSize: '0.62rem', color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: 1 },
+  streakDivider: { width: 1, height: 36, background: 'var(--border)', margin: '0 16px' },
+
   gmGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
   gmBtn: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
@@ -591,6 +685,8 @@ const styles = {
     background: 'linear-gradient(135deg, var(--mauve-deep), var(--mauve))',
     borderColor: 'transparent',
     color: 'white',
+    cursor: 'not-allowed',
+    opacity: 0.85,
   },
   gmLabel: { fontSize: '0.8rem', fontWeight: 700, color: 'inherit' },
   gmPartnerBadge: {

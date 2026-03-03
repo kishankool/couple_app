@@ -105,5 +105,17 @@ service cloud.firestore {
     match /push_subs/{docId} {
       allow read, write: if true;
     }
+
+    match /cal_events/{docId} {
+      allow read, write: if true;
+    }
+
+    match /time_capsules/{docId} {
+      allow read, write: if true;
+    }
+
+    match /love_chat/{docId} {
+      allow read, write: if true;
+    }
   }
 }

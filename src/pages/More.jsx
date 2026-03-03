@@ -29,7 +29,6 @@ const MORE_TABS = [
   { key: 'ideas', icon: '🌹', label: 'Date Ideas' },
   { key: 'countdowns', icon: '🎉', label: 'Countdowns' },
   { key: 'stats', icon: '📊', label: 'Stats' },
-  { key: 'moods', icon: '🌙', label: 'Moods' },
 ]
 
 function liveCountdown(dateStr) {
@@ -92,7 +91,6 @@ export default function More() {
 
   const [ideas, setIdeas] = useState([])
   const [events, setEvents] = useState([])
-  const [moods, setMoods] = useState([])
 
   // Ref for the date-randomizer interval so it can be cleared on unmount
   const intervalRef = useRef(null)
@@ -118,8 +116,7 @@ export default function More() {
   useEffect(() => {
     const u1 = fsListen('date_ideas', d => setIdeas(d))
     const u2 = fsListen('events', d => setEvents(d))
-    const u3 = fsListen('moods', d => setMoods(d))
-    return () => { u1(); u2(); u3() }
+    return () => { u1(); u2() }
   }, [])
 
   // Save date idea
@@ -242,8 +239,7 @@ export default function More() {
             <span className="tab-count">
               {tab.key === 'ideas' ? allIdeas.length
                 : tab.key === 'countdowns' ? events.length
-                  : tab.key === 'moods' ? moods.length
-                    : '∞'}
+                  : '∞'}
             </span>
           </button>
         ))}
@@ -364,32 +360,6 @@ export default function More() {
           <Card>
             <CardTitle icon="📊">Relationship Stats</CardTitle>
             <RelStats />
-          </Card>
-        </div>
-      )}
-
-      {/* ── Moods Tab ── */}
-      {activeTab === 'moods' && (
-        <div style={{ animation: 'fadeUp 0.25s ease' }}>
-          <Card>
-            <CardTitle icon="🌙">Mood History</CardTitle>
-            {moods.length === 0 ? (
-              <div className="empty-state" style={{ padding: 16 }}>No moods logged yet!</div>
-            ) : moods.map((m, i) => (
-              <div key={`mood-${i}`} style={{ ...S.moodRow, animationDelay: `${Math.min(i * 0.03, 0.5)}s` }}>
-                <span style={{ fontSize: '1.5rem' }}>{m.emoji}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={S.moodWho}>
-                    {m.who === 'Kishan' ? '💙' : '🌸'} {m.who}
-                  </div>
-                  <div style={S.moodWhen}>
-                    {m.date
-                      ? new Date(m.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                      : ''}
-                  </div>
-                </div>
-              </div>
-            ))}
           </Card>
         </div>
       )}

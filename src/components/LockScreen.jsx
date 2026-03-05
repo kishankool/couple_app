@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { loginAnon } from '../firebase'
 
 // Hash a string using SHA-256 (returns hex string, case-sensitive)
 async function sha256(text) {
@@ -28,9 +29,14 @@ export default function LockScreen({ onUnlock }) {
   const tryUnlock = async () => {
     // Fast-path: no passphrase configured yet — let owner in immediately
     if (notConfigured) {
-      sessionStorage.setItem('ka_unlocked', '1')
-      sessionStorage.setItem('ka_role', 'owner')
-      onUnlock('owner')
+      try {
+        await loginAnon()
+        sessionStorage.setItem('ka_unlocked', '1')
+        sessionStorage.setItem('ka_role', 'owner')
+        onUnlock('owner')
+      } catch (err) {
+        console.error('Firebase auth failed:', err)
+      }
       return
     }
 
@@ -39,9 +45,17 @@ export default function LockScreen({ onUnlock }) {
 
     const inputHash = await sha256(val)
     if (inputHash === STORED_HASH) {
-      sessionStorage.setItem('ka_unlocked', '1')
-      sessionStorage.setItem('ka_role', 'owner')
-      onUnlock('owner')
+      try {
+        await loginAnon()
+        sessionStorage.setItem('ka_unlocked', '1')
+        sessionStorage.setItem('ka_role', 'owner')
+        onUnlock('owner')
+      } catch (err) {
+        console.error('Firebase auth failed:', err)
+        setShake(true)
+        setWrong(true)
+        setTimeout(() => { setShake(false); setChecking(false) }, 600)
+      }
     } else {
       setShake(true)
       setWrong(true)

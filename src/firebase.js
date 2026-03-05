@@ -4,6 +4,7 @@ import {
   getFirestore, collection, addDoc, deleteDoc, doc, setDoc,
   query, orderBy, onSnapshot, updateDoc, serverTimestamp
 } from 'firebase/firestore'
+import { getAuth, signInAnonymously, signOut as firebaseSignOut } from 'firebase/auth'
 import imageCompression from 'browser-image-compression'
 
 const firebaseConfig = {
@@ -16,7 +17,11 @@ const firebaseConfig = {
 }
 
 const app = initializeApp(firebaseConfig)
-export const db = getFirestore(app)
+export const db   = getFirestore(app)
+export const auth = getAuth(app)
+
+export const loginAnon = () => signInAnonymously(auth)
+export const logout    = () => firebaseSignOut(auth)
 
 export const fsAdd    = (col, data) => addDoc(collection(db, col), { ...data, createdAt: serverTimestamp() })
 export const fsDelete = (col, id)   => deleteDoc(doc(db, col, id))
@@ -42,11 +47,8 @@ export const fsListen = (col, cb, order = 'createdAt') => {
   }
 }
 
-// Cloudinary upload — free tier, no payment needed
+// Cloudinary upload — signed via serverless function so API secret never hits the browser
 export const uploadImageCloudinary = async (file) => {
-  const cloudName    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
-  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
-  
   // Compress image before upload
   const options = {
     maxSizeMB: 1,
@@ -55,10 +57,22 @@ export const uploadImageCloudinary = async (file) => {
   }
   const compressedFile = await imageCompression(file, options)
 
+  // Get a server-generated signature (CLOUDINARY_API_SECRET lives only on the server)
+  const sigRes = await fetch('/api/cloudinary-sign', { method: 'POST' })
+  if (!sigRes.ok) throw new Error('Failed to get upload signature')
+  const { signature, timestamp, apiKey, cloudName, preset } = await sigRes.json()
+
   const formData = new FormData()
   formData.append('file', compressedFile)
-  formData.append('upload_preset', uploadPreset)
-  const res  = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: formData })
+  formData.append('upload_preset', preset)
+  formData.append('timestamp', timestamp)
+  formData.append('signature', signature)
+  formData.append('api_key', apiKey)
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    method: 'POST',
+    body: formData,
+  })
   if (!res.ok) throw new Error('Cloudinary upload failed')
   const data = await res.json()
   return data.secure_url

@@ -1,124 +1,58 @@
 rules_version = '2';
 
 // Kishan & Aditi Couple App — Firestore Security Rules
-// ────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────
 //
-// PUBLIC collections (anyone can read):
+// Auth model: Firebase Anonymous Auth
+//   - Owners call signInAnonymously() after entering the correct passphrase.
+//   - Firebase issues a real cryptographic token the server verifies.
+//   - Visitors never sign in, so they only reach collections where read: if true.
+//   - No browser-side hack (sessionStorage etc.) can fake request.auth.
+//
+// PUBLIC collections (anyone can read, owners can write):
 //   - memories       → Polaroid memories / scrapbook
 //   - events         → Countdowns / upcoming events
 //
-// PRIVATE collections (read/write requires the app secret):
-//   - notes          → Love notes
-//   - todos          → Shared to-dos
-//   - updates_photos → Photo updates
-//   - updates_locations → Location updates
-//   - moods          → Daily mood logs
-//   - date_ideas     → Date idea suggestions
-//
-// WRITE ACCESS: All writes require the request to come from
-// an authenticated session (the couple entering the secret code).
-//
-// Since this app uses client-side authentication (lock screen code),
-// Firestore rules use a simple shared-secret approach via a custom
-// "appSecret" field or via Firebase Anonymous Auth with custom claims.
-//
-// SIMPLE APPROACH (no Firebase Auth): Allow all reads/writes
-// and rely on the client-side lock screen. This is suitable for
-// a personal couple app where data isn't highly sensitive.
-//
-// RECOMMENDED APPROACH: Use Firebase Anonymous Auth + custom claims
-// to restrict writes. Set up a Cloud Function that verifies the
-// secret code and issues a custom token.
+// PRIVATE collections (read + write require Firebase Anonymous Auth):
+//   - Everything else
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Public collections: anyone can read ──
+    // ── Helper: caller has a valid Firebase session ──
+    function isOwner() {
+      return request.auth != null;
+    }
+
+    // ── PUBLIC: anyone can read, owners can write ──
     match /memories/{docId} {
-      allow read: if true;
-      allow write: if true;  // Lock screen protects writes client-side
+      allow read:  if true;
+      allow write: if isOwner();
     }
 
     match /events/{docId} {
-      allow read: if true;
-      allow write: if true;
+      allow read:  if true;
+      allow write: if isOwner();
     }
 
-    // ── Private collections: protected by client-side auth ──
-    // In production, use: allow read, write: if request.auth != null;
-    match /notes/{docId} {
-      allow read, write: if true;
-    }
-
-    match /todos/{docId} {
-      allow read, write: if true;
-    }
-
-    match /updates_photos/{docId} {
-      allow read, write: if true;
-    }
-
-    match /updates_locations/{docId} {
-      allow read, write: if true;
-    }
-
-    match /moods/{docId} {
-      allow read, write: if true;
-    }
-
-    match /date_ideas/{docId} {
-      allow read, write: if true;
-    }
-
-    match /couple_answers/{docId} {
-      allow read, write: if true;
-    }
-
-    match /good_morning/{docId} {
-      allow read, write: if true;
-    }
-
-    match /miss_you/{docId} {
-      allow read, write: if true;
-    }
-
-    match /hugs_kisses/{docId} {
-      allow read, write: if true;
-    }
-
-    match /photos/{docId} {
-      allow read, write: if true;
-    }
-
-    match /locations/{docId} {
-      allow read, write: if true;
-    }
-
-    match /love_reasons/{docId} {
-      allow read, write: if true;
-    }
-
-    match /wishlist/{docId} {
-      allow read, write: if true;
-    }
-
-    match /push_subs/{docId} {
-      allow read, write: if true;
-    }
-
-    match /cal_events/{docId} {
-      allow read: if true;
-      allow write: if true;  // No Firebase Auth in this app — lock screen protects client-side
-    }
-
-    match /time_capsules/{docId} {
-      allow read: if true;
-      allow write: if true;  // No Firebase Auth in this app — lock screen protects client-side
-    }
-
-    match /love_chat/{docId} {
-      allow read: if true;
-      allow write: if true;  // No Firebase Auth in this app — lock screen protects client-side
-    }
+    // ── PRIVATE: owners only ──
+    match /notes/{docId}             { allow read, write: if isOwner(); }
+    match /todos/{docId}             { allow read, write: if isOwner(); }
+    match /updates_photos/{docId}    { allow read, write: if isOwner(); }
+    match /updates_locations/{docId} { allow read, write: if isOwner(); }
+    match /moods/{docId}             { allow read, write: if isOwner(); }
+    match /date_ideas/{docId}        { allow read, write: if isOwner(); }
+    match /couple_answers/{docId}    { allow read, write: if isOwner(); }
+    match /good_morning/{docId}      { allow read, write: if isOwner(); }
+    match /miss_you/{docId}          { allow read, write: if isOwner(); }
+    match /hugs_kisses/{docId}       { allow read, write: if isOwner(); }
+    match /photos/{docId}            { allow read, write: if isOwner(); }
+    match /locations/{docId}         { allow read, write: if isOwner(); }
+    match /love_reasons/{docId}      { allow read, write: if isOwner(); }
+    match /wishlist/{docId}          { allow read, write: if isOwner(); }
+    match /push_subs/{docId}         { allow read, write: if isOwner(); }
+    match /cal_events/{docId}        { allow read, write: if isOwner(); }
+    match /time_capsules/{docId}     { allow read, write: if isOwner(); }
+    match /love_chat/{docId}         { allow read, write: if isOwner(); }
   }
 }

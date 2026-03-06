@@ -11,8 +11,8 @@ async function sha256(text) {
     .join('')
 }
 
-// The correct hash lives in .env as VITE_APP_PASSHASH (gitignored — safe for public repos)
-// If not set yet, show a setup prompt
+// STORED_HASH is only used for the local `npm run dev` fallback (no Vercel functions).
+// The real verification always goes through /api/verify-passphrase on the server.
 const STORED_HASH = import.meta.env.VITE_APP_PASSHASH || ''
 
 export default function LockScreen({ onUnlock }) {
@@ -23,16 +23,7 @@ export default function LockScreen({ onUnlock }) {
   const [wrong, setWrong] = useState(false)
   const [showPass, setShowPass] = useState(false)
 
-  // If no hash is configured yet, show a setup notice
-  const notConfigured = !STORED_HASH
-
   const tryUnlock = async () => {
-    // Guard: if no passphrase is configured, refuse owner access entirely.
-    if (notConfigured) {
-      console.error('LockScreen: VITE_APP_PASSHASH is not set. Run "npm run setup-pass" to configure.')
-      return
-    }
-
     if (!val.trim() || checking) return
     setChecking(true)
 
@@ -143,62 +134,51 @@ export default function LockScreen({ onUnlock }) {
         <h1 style={s.title}>Kishan &amp; Aditi</h1>
         <p style={s.sub}>This is our private space.<br />Enter the secret to continue 🌸</p>
 
-        {notConfigured && (
-          <div style={s.setupBanner}>
-            🔒 No passphrase configured — owner access is disabled.<br /><br />
-            Run <code style={s.code}>npm run setup-pass</code> to set a passphrase,
-            then restart the dev server. You may still enter as a Visitor below.
+        <>
+          <div style={s.question}>
+            What's our secret word? 🌹
           </div>
-        )}
 
-        {!notConfigured && (
-          <>
-            <div style={s.question}>
-              What's our secret word? 🌹
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPass ? 'text' : 'password'}
+              value={val}
+              placeholder="Enter passphrase..."
+              onChange={e => { setVal(e.target.value); setWrong(false) }}
+              onKeyDown={e => e.key === 'Enter' && tryUnlock()}
+              style={{
+                ...s.input,
+                borderColor: wrong ? '#e88080' : 'rgba(200,120,140,0.3)',
+                paddingRight: 44,
+              }}
+              autoCapitalize="none"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPass(v => !v)}
+              style={s.eyeBtn}
+              aria-label={showPass ? 'Hide passphrase' : 'Show passphrase'}
+            >
+              {showPass ? '🙈' : '👁️'}
+            </button>
+          </div>
+
+          {wrong && (
+            <div style={s.wrongMsg}>
+              {attempts >= 3
+                ? '💡 Hint: Think of our special word 💕'
+                : "That's not right, try again 🌸"}
             </div>
-
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showPass ? 'text' : 'password'}
-                value={val}
-                placeholder="Enter passphrase..."
-                onChange={e => { setVal(e.target.value); setWrong(false) }}
-                onKeyDown={e => e.key === 'Enter' && tryUnlock()}
-                style={{
-                  ...s.input,
-                  borderColor: wrong ? '#e88080' : 'rgba(200,120,140,0.3)',
-                  paddingRight: 44,
-                }}
-                autoCapitalize="none"
-                autoComplete="off"
-                autoCorrect="off"
-                spellCheck={false}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPass(v => !v)}
-                style={s.eyeBtn}
-                aria-label={showPass ? 'Hide passphrase' : 'Show passphrase'}
-              >
-                {showPass ? '🙈' : '👁️'}
-              </button>
-            </div>
-
-            {wrong && (
-              <div style={s.wrongMsg}>
-                {attempts >= 3
-                  ? '💡 Hint: Think of our special word 💕'
-                  : "That's not right, try again 🌸"}
-              </div>
-            )}
-          </>
-        )}
+          )}
+        </>
 
         <button
-          style={{ ...s.btn, opacity: (checking || notConfigured) ? 0.45 : 1 }}
+          style={{ ...s.btn, opacity: checking ? 0.45 : 1 }}
           onClick={tryUnlock}
-          disabled={checking || notConfigured}
-          title={notConfigured ? 'Set VITE_APP_PASSHASH first (npm run setup-pass)' : undefined}
+          disabled={checking}
         >
           {checking ? 'Checking…' : 'Enter with love 💕'}
         </button>

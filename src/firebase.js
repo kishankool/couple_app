@@ -58,7 +58,12 @@ export const uploadImageCloudinary = async (file) => {
   const compressedFile = await imageCompression(file, options)
 
   // Get a server-generated signature (CLOUDINARY_API_SECRET lives only on the server)
-  const sigRes = await fetch('/api/cloudinary-sign', { method: 'POST' })
+  // The X-Session-Token proves this caller passed the passphrase check.
+  const sessionToken = sessionStorage.getItem('ka_session_token') || ''
+  const sigRes = await fetch('/api/cloudinary-sign', {
+    method: 'POST',
+    headers: { 'X-Session-Token': sessionToken },
+  })
   if (!sigRes.ok) throw new Error('Failed to get upload signature')
   const { signature, timestamp, apiKey, cloudName, preset } = await sigRes.json()
 

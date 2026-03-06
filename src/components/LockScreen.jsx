@@ -27,41 +27,86 @@ export default function LockScreen({ onUnlock }) {
   const notConfigured = !STORED_HASH
 
   const tryUnlock = async () => {
-    // Fast-path: no passphrase configured yet — let owner in immediately
+    // Guard: if no passphrase is configured, refuse owner access entirely.
     if (notConfigured) {
-      try {
-        await loginAnon()
-        sessionStorage.setItem('ka_unlocked', '1')
-        sessionStorage.setItem('ka_role', 'owner')
-        onUnlock('owner')
-      } catch (err) {
-        console.error('Firebase auth failed:', err)
-      }
+      console.error('LockScreen: VITE_APP_PASSHASH is not set. Run "npm run setup-pass" to configure.')
       return
     }
 
     if (!val.trim() || checking) return
     setChecking(true)
 
-    const inputHash = await sha256(val)
-    if (inputHash === STORED_HASH) {
-      try {
+    try {
+      // ── Primary path: verify passphrase server-side (production on Vercel) ──
+      // The raw passphrase travels over HTTPS; the server hashes + compares it
+      // against APP_PASSHASH which never touches the browser bundle.
+      const res = await fetch('/api/verify-passphrase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passphrase: val }),
+      })
+
+      if (res.status === 429) {
+        // Rate limited
+        setShake(true)
+        setWrong(true)
+        setAttempts(a => a + 1)
+        setTimeout(() => { setShake(false); setChecking(false) }, 600)
+        return
+      }
+
+      if (res.ok) {
+        // Correct — store session token for subsequent API calls (e.g. cloudinary-sign)
+        const { sessionToken } = await res.json()
+        if (sessionToken) sessionStorage.setItem('ka_session_token', sessionToken)
         await loginAnon()
         sessionStorage.setItem('ka_unlocked', '1')
         sessionStorage.setItem('ka_role', 'owner')
         onUnlock('owner')
-      } catch (err) {
-        console.error('Firebase auth failed:', err)
+        setChecking(false)
+        return
+      }
+
+      if (res.status === 403) {
+        // Wrong passphrase
         setShake(true)
         setWrong(true)
+        setAttempts(a => a + 1)
+        setTimeout(() => { setShake(false); setChecking(false) }, 600)
+        setChecking(false)
+        return
+      }
+
+      // Any other server error — fall through to local fallback below
+      throw new Error(`Server returned ${res.status}`)
+
+    } catch (err) {
+      // ── Fallback: client-side hash check for local dev (npm run dev) ──
+      // /api/verify-passphrase is only available via `vercel dev` or in production.
+      // In plain `npm run dev` (Vite only) we fall back to comparing VITE_APP_PASSHASH.
+      console.warn('LockScreen: server verify unavailable, using local fallback.', err.message)
+
+      const inputHash = await sha256(val)
+      if (inputHash === STORED_HASH) {
+        try {
+          await loginAnon()
+          sessionStorage.setItem('ka_unlocked', '1')
+          sessionStorage.setItem('ka_role', 'owner')
+          onUnlock('owner')
+        } catch (authErr) {
+          console.error('Firebase auth failed:', authErr)
+          setShake(true)
+          setWrong(true)
+          setTimeout(() => { setShake(false) }, 600)
+        }
+      } else {
+        setShake(true)
+        setWrong(true)
+        setAttempts(a => a + 1)
         setTimeout(() => { setShake(false); setChecking(false) }, 600)
       }
-    } else {
-      setShake(true)
-      setWrong(true)
-      setAttempts(a => a + 1)
-      setTimeout(() => { setShake(false); setChecking(false) }, 600)
     }
+
     setChecking(false)
   }
 
@@ -77,8 +122,9 @@ export default function LockScreen({ onUnlock }) {
 
         {notConfigured && (
           <div style={s.setupBanner}>
-            ⚙️ No passphrase set yet — run <code style={s.code}>npm run setup-pass</code> to configure.
-            <br /><br />Tap the button below to enter as owner for now.
+            🔒 No passphrase configured — owner access is disabled.<br /><br />
+            Run <code style={s.code}>npm run setup-pass</code> to set a passphrase,
+            then restart the dev server. You may still enter as a Visitor below.
           </div>
         )}
 
@@ -126,9 +172,10 @@ export default function LockScreen({ onUnlock }) {
         )}
 
         <button
-          style={{ ...s.btn, opacity: checking ? 0.7 : 1 }}
+          style={{ ...s.btn, opacity: (checking || notConfigured) ? 0.45 : 1 }}
           onClick={tryUnlock}
-          disabled={checking}
+          disabled={checking || notConfigured}
+          title={notConfigured ? 'Set VITE_APP_PASSHASH first (npm run setup-pass)' : undefined}
         >
           {checking ? 'Checking…' : 'Enter with love 💕'}
         </button>

@@ -19,7 +19,8 @@ const cleanupInterval = setInterval(() => {
     if (now > entry.resetAt) rateMap.delete(ip)
   }
 }, RATE_WINDOW)
-// Allow Node to exit cleanly if the module is torn down (e.g. tests)
+// Allow Node to exit cleanly if the module is torn down (e.g. tests).
+// The interval above handles all cleanup; no per-entry setTimeout is needed.
 if (cleanupInterval.unref) cleanupInterval.unref()
 
 function isRateLimited(req) {
@@ -28,10 +29,10 @@ function isRateLimited(req) {
   const entry = rateMap.get(ip)
 
   if (!entry || now > entry.resetAt) {
-    // Entry is absent or expired — replace with a fresh one
+    // Entry is absent or expired — replace with a fresh one.
+    // The periodic setInterval cleanup above removes stale entries;
+    // no per-entry setTimeout is needed (and would leak timer handles).
     rateMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW })
-    // Schedule deletion so stale entries don't outlive the window
-    setTimeout(() => rateMap.delete(ip), RATE_WINDOW)
     return false
   }
 
@@ -54,10 +55,43 @@ function safeEqual(a, b) {
 
 // HMAC-based session token signed with SESSION_TOKEN_SECRET (not APP_PASSHASH).
 // Keeping the two secrets separate means compromising one doesn't compromise the other.
-// Valid for the current 15-min window; stateless — any server instance can verify it.
+//
+// Token format (dot-separated, base64url):
+//   <payload_b64>.<hmac_b64>
+// Payload JSON: { nonce, exp }
+//   nonce — 16 random bytes (hex) so every token is unique
+//   exp   — Unix seconds when the token expires (15 min from issuance)
+//
+// Any server route can call verifySessionToken() to validate without a DB.
+const TOKEN_TTL_MS = 15 * 60 * 1000  // 15 minutes
+
 function makeSessionToken(secret) {
-  const win = Math.floor(Date.now() / (15 * 60 * 1000))
-  return crypto.createHmac('sha256', secret).update(String(win)).digest('hex')
+  const payload = JSON.stringify({
+    nonce: crypto.randomBytes(16).toString('hex'),
+    exp:   Math.floor((Date.now() + TOKEN_TTL_MS) / 1000),
+  })
+  const payloadB64 = Buffer.from(payload).toString('base64url')
+  const sig = crypto.createHmac('sha256', secret).update(payloadB64).digest('base64url')
+  return `${payloadB64}.${sig}`
+}
+
+// Exported so other API routes (e.g. cloudinary-sign) can validate the token.
+export function verifySessionToken(token, secret) {
+  if (typeof token !== 'string') return false
+  const dot = token.lastIndexOf('.')
+  if (dot < 1) return false
+  const payloadB64 = token.slice(0, dot)
+  const receivedSig = token.slice(dot + 1)
+  // Re-compute expected signature
+  const expectedSig = crypto.createHmac('sha256', secret).update(payloadB64).digest('base64url')
+  if (!crypto.timingSafeEqual(Buffer.from(receivedSig, 'base64url'), Buffer.from(expectedSig, 'base64url'))) return false
+  // Check expiry
+  try {
+    const { exp } = JSON.parse(Buffer.from(payloadB64, 'base64url').toString())
+    return typeof exp === 'number' && Math.floor(Date.now() / 1000) < exp
+  } catch {
+    return false
+  }
 }
 
 export default async function handler(req, res) {
@@ -83,6 +117,11 @@ export default async function handler(req, res) {
 
   const { passphrase } = req.body || {}
   if (!passphrase || typeof passphrase !== 'string' || passphrase.length > 500) {
+    return res.status(400).json({ error: 'Invalid request' })
+  }
+  // Reject whitespace-only values before hashing — trim() would produce an
+  // empty string which could accidentally match a misconfigured hash.
+  if (!passphrase.trim()) {
     return res.status(400).json({ error: 'Invalid request' })
   }
 

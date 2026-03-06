@@ -21,7 +21,25 @@ export const db   = getFirestore(app)
 export const auth = getAuth(app)
 
 export const loginAnon = () => signInAnonymously(auth)
-export const logout    = () => firebaseSignOut(auth)
+
+// Centralised session teardown: Firebase sign-out + all client session keys.
+// Use this for logout and for any 401 / session-expired responses.
+export const clearClientSession = async () => {
+  // Remove the server-issued session token
+  sessionStorage.removeItem('ka_session_token')
+  // Remove unlock / role flags
+  sessionStorage.removeItem('ka_unlocked')
+  sessionStorage.removeItem('ka_role')
+  // Remove any owner-specific keys
+  for (const key of Object.keys(sessionStorage)) {
+    if (key.startsWith('ka_owner_')) sessionStorage.removeItem(key)
+  }
+  // Firebase sign-out (best-effort; ignore errors so callers can always proceed)
+  try { await firebaseSignOut(auth) } catch { /* ignore */ }
+}
+
+// Simple re-export for callers that only need Firebase sign-out (e.g. tests).
+export const logout = () => clearClientSession()
 
 export const fsAdd    = (col, data) => addDoc(collection(db, col), { ...data, createdAt: serverTimestamp() })
 export const fsDelete = (col, id)   => deleteDoc(doc(db, col, id))
@@ -65,13 +83,17 @@ export const uploadImageCloudinary = async (file) => {
     headers: { 'X-Session-Token': sessionToken },
   })
   if (sigRes.status === 401) {
-    // Session token is stale or missing — clear it so the next upload attempt
-    // forces the user back through the passphrase flow rather than looping on 401.
-    sessionStorage.removeItem('ka_session_token')
+    // Session token is stale or missing — clear all client session state so the
+    // next upload attempt forces the user back through the passphrase flow.
+    await clearClientSession()
     throw new Error('Session expired — please re-enter the passphrase to upload images')
   }
   if (!sigRes.ok) throw new Error('Failed to get upload signature')
-  const { signature, timestamp, apiKey, cloudName, preset } = await sigRes.json()
+  const sigData = await sigRes.json()
+  const { signature, timestamp, apiKey, cloudName, preset } = sigData
+  if (!signature || !timestamp || !apiKey || !cloudName || !preset) {
+    throw new Error('Cloudinary sign response is incomplete — contact the app owner')
+  }
 
   const formData = new FormData()
   formData.append('file', compressedFile)

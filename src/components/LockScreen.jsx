@@ -56,10 +56,23 @@ export default function LockScreen({ onUnlock }) {
       }
 
       if (res.ok) {
-        // Correct — store session token for subsequent API calls (e.g. cloudinary-sign)
+        // Correct — store session token only after Firebase auth succeeds.
+        // If loginAnon() throws, we do NOT persist any partial session state.
         const { sessionToken } = await res.json()
+        try {
+          await loginAnon()
+        } catch (authErr) {
+          // Firebase anonymous auth failed — clean up so no stale token remains.
+          sessionStorage.removeItem('ka_session_token')
+          sessionStorage.removeItem('ka_unlocked')
+          console.error('LockScreen: Firebase auth failed after passphrase accepted:', authErr)
+          setShake(true)
+          setWrong(true)
+          setTimeout(() => { setShake(false); setChecking(false) }, 600)
+          return
+        }
+        // Both passphrase and Firebase auth succeeded — persist session now.
         if (sessionToken) sessionStorage.setItem('ka_session_token', sessionToken)
-        await loginAnon()
         sessionStorage.setItem('ka_unlocked', '1')
         sessionStorage.setItem('ka_role', 'owner')
         onUnlock('owner')

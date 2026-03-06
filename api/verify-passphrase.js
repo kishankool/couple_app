@@ -53,46 +53,10 @@ function safeEqual(a, b) {
   return r === 0
 }
 
-// HMAC-based session token signed with SESSION_TOKEN_SECRET (not APP_PASSHASH).
-// Keeping the two secrets separate means compromising one doesn't compromise the other.
-//
-// Token format (dot-separated, base64url):
-//   <payload_b64>.<hmac_b64>
-// Payload JSON: { nonce, exp }
-//   nonce — 16 random bytes (hex) so every token is unique
-//   exp   — Unix seconds when the token expires (15 min from issuance)
-//
-// Any server route can call verifySessionToken() to validate without a DB.
-const TOKEN_TTL_MS = 15 * 60 * 1000  // 15 minutes
+// Shared HMAC session token helpers — format defined in api/_token.js
+import { makeSessionToken, verifySessionToken } from './_token.js'
+export { verifySessionToken }
 
-function makeSessionToken(secret) {
-  const payload = JSON.stringify({
-    nonce: crypto.randomBytes(16).toString('hex'),
-    exp:   Math.floor((Date.now() + TOKEN_TTL_MS) / 1000),
-  })
-  const payloadB64 = Buffer.from(payload).toString('base64url')
-  const sig = crypto.createHmac('sha256', secret).update(payloadB64).digest('base64url')
-  return `${payloadB64}.${sig}`
-}
-
-// Exported so other API routes (e.g. cloudinary-sign) can validate the token.
-export function verifySessionToken(token, secret) {
-  if (typeof token !== 'string') return false
-  const dot = token.lastIndexOf('.')
-  if (dot < 1) return false
-  const payloadB64 = token.slice(0, dot)
-  const receivedSig = token.slice(dot + 1)
-  // Re-compute expected signature
-  const expectedSig = crypto.createHmac('sha256', secret).update(payloadB64).digest('base64url')
-  if (!crypto.timingSafeEqual(Buffer.from(receivedSig, 'base64url'), Buffer.from(expectedSig, 'base64url'))) return false
-  // Check expiry
-  try {
-    const { exp } = JSON.parse(Buffer.from(payloadB64, 'base64url').toString())
-    return typeof exp === 'number' && Math.floor(Date.now() / 1000) < exp
-  } catch {
-    return false
-  }
-}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()

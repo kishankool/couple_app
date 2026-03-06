@@ -7,8 +7,8 @@
 // Token is verified using SESSION_TOKEN_SECRET (not APP_PASSHASH).
 
 import crypto from 'crypto'
-// Shared token verifier — keeps both endpoints in sync with the same token format.
-import { verifySessionToken } from './verify-passphrase.js'
+// Shared token verifier — defined in api/_token.js (not an endpoint).
+import { verifySessionToken } from './_token.js'
 
 export default function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()

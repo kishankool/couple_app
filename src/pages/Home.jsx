@@ -206,7 +206,14 @@ export default function Home() {
   // Load Good Morning / Good Night data + streaks
   useEffect(() => {
     if (isVisitor) return
-    let isActive = true // guard against stale promises after dep change
+    let isActive = true
+
+    // Restore last-known streaks from sessionStorage so a refresh while offline
+    // shows the correct value instead of 0.
+    const cachedGM = sessionStorage.getItem(`ka_gmStreak_${who}`)
+    const cachedGN = sessionStorage.getItem(`ka_gnStreak_${who}`)
+    if (cachedGM !== null) setGmStreak(Number(cachedGM))
+    if (cachedGN !== null) setGnStreak(Number(cachedGN))
 
     // Load today's GM/GN flags
     const ref = doc(db, 'good_morning', todayKey)
@@ -214,15 +221,19 @@ export default function Home() {
       if (isActive) setGmData(snap.exists() ? snap.data() : {})
     }).catch(() => { })
 
-    // One batched read for both streaks
+    // One batched read for both streaks.
+    // Only update state when the read SUCCEEDS — errors are swallowed silently
+    // so a network blip or cold-start never resets the streak display to 0.
     computeStreaks(`${who}GM`, `${who}GN`)
       .then(({ gmStreak, gnStreak }) => {
-        if (isActive) {
-          setGmStreak(gmStreak)
-          setGnStreak(gnStreak)
-        }
+        if (!isActive) return
+        setGmStreak(gmStreak)
+        setGnStreak(gnStreak)
+        // Persist so the next load (or refresh) shows the correct value instantly.
+        sessionStorage.setItem(`ka_gmStreak_${who}`, String(gmStreak))
+        sessionStorage.setItem(`ka_gnStreak_${who}`, String(gnStreak))
       })
-      .catch(() => { })
+      .catch(() => { /* keep existing displayed value on error */ })
 
     return () => { isActive = false }
   }, [todayKey, isVisitor, who])

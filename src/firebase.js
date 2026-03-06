@@ -4,6 +4,7 @@ import {
   getFirestore, collection, addDoc, deleteDoc, doc, setDoc,
   query, orderBy, onSnapshot, updateDoc, serverTimestamp
 } from 'firebase/firestore'
+import { getAuth, signInAnonymously, signOut as firebaseSignOut } from 'firebase/auth'
 import imageCompression from 'browser-image-compression'
 
 const firebaseConfig = {
@@ -16,7 +17,29 @@ const firebaseConfig = {
 }
 
 const app = initializeApp(firebaseConfig)
-export const db = getFirestore(app)
+export const db   = getFirestore(app)
+export const auth = getAuth(app)
+
+export const loginAnon = () => signInAnonymously(auth)
+
+// Centralised session teardown: Firebase sign-out + all client session keys.
+// Use this for logout and for any 401 / session-expired responses.
+export const clearClientSession = async () => {
+  // Remove the server-issued session token
+  sessionStorage.removeItem('ka_session_token')
+  // Remove unlock / role flags
+  sessionStorage.removeItem('ka_unlocked')
+  sessionStorage.removeItem('ka_role')
+  // Remove any owner-specific keys
+  for (const key of Object.keys(sessionStorage)) {
+    if (key.startsWith('ka_owner_')) sessionStorage.removeItem(key)
+  }
+  // Firebase sign-out (best-effort; ignore errors so callers can always proceed)
+  try { await firebaseSignOut(auth) } catch { /* ignore */ }
+}
+
+// Simple re-export for callers that only need Firebase sign-out (e.g. tests).
+export const logout = () => clearClientSession()
 
 export const fsAdd    = (col, data) => addDoc(collection(db, col), { ...data, createdAt: serverTimestamp() })
 export const fsDelete = (col, id)   => deleteDoc(doc(db, col, id))
@@ -42,11 +65,8 @@ export const fsListen = (col, cb, order = 'createdAt') => {
   }
 }
 
-// Cloudinary upload — free tier, no payment needed
+// Cloudinary upload — signed via serverless function so API secret never hits the browser
 export const uploadImageCloudinary = async (file) => {
-  const cloudName    = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
-  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
-  
   // Compress image before upload
   const options = {
     maxSizeMB: 1,
@@ -55,10 +75,37 @@ export const uploadImageCloudinary = async (file) => {
   }
   const compressedFile = await imageCompression(file, options)
 
+  // Get a server-generated signature (CLOUDINARY_API_SECRET lives only on the server)
+  // The X-Session-Token proves this caller passed the passphrase check.
+  const sessionToken = sessionStorage.getItem('ka_session_token') || ''
+  const sigRes = await fetch('/api/cloudinary-sign', {
+    method: 'POST',
+    headers: { 'X-Session-Token': sessionToken },
+  })
+  if (sigRes.status === 401) {
+    // Session token is stale or missing — clear all client session state so the
+    // next upload attempt forces the user back through the passphrase flow.
+    await clearClientSession()
+    throw new Error('Session expired — please re-enter the passphrase to upload images')
+  }
+  if (!sigRes.ok) throw new Error('Failed to get upload signature')
+  const sigData = await sigRes.json()
+  const { signature, timestamp, apiKey, cloudName, preset } = sigData
+  if (!signature || !timestamp || !apiKey || !cloudName || !preset) {
+    throw new Error('Cloudinary sign response is incomplete — contact the app owner')
+  }
+
   const formData = new FormData()
   formData.append('file', compressedFile)
-  formData.append('upload_preset', uploadPreset)
-  const res  = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: formData })
+  formData.append('upload_preset', preset)
+  formData.append('timestamp', timestamp)
+  formData.append('signature', signature)
+  formData.append('api_key', apiKey)
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    method: 'POST',
+    body: formData,
+  })
   if (!res.ok) throw new Error('Cloudinary upload failed')
   const data = await res.json()
   return data.secure_url

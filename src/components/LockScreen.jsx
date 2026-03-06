@@ -28,14 +28,6 @@ export default function LockScreen({ onUnlock }) {
     setChecking(true)
 
     try {
-      // ── Primary path: verify passphrase server-side (production on Vercel) ──
-      // The raw passphrase travels over HTTPS; the server hashes + compares it
-      // against APP_PASSHASH which never touches the browser bundle.
-      const res = await fetch('/api/verify-passphrase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passphrase: val }),
-      })
 
       if (res.status === 429) {
         // Rate limited

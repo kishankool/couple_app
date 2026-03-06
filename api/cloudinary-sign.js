@@ -7,24 +7,8 @@
 // Token is verified using SESSION_TOKEN_SECRET (not APP_PASSHASH).
 
 import crypto from 'crypto'
-
-// Constant-time comparison
-function safeEqual(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false
-  let r = 0
-  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return r === 0
-}
-
-// Accept current and previous 15-min window to avoid edge-case lockouts.
-// Uses SESSION_TOKEN_SECRET — distinct from APP_PASSHASH.
-function isValidSessionToken(token, secret) {
-  if (!token || !secret) return false
-  const win  = Math.floor(Date.now() / (15 * 60 * 1000))
-  const curr = crypto.createHmac('sha256', secret).update(String(win)).digest('hex')
-  const prev = crypto.createHmac('sha256', secret).update(String(win - 1)).digest('hex')
-  return safeEqual(token, curr) || safeEqual(token, prev)
-}
+// Shared token verifier — keeps both endpoints in sync with the same token format.
+import { verifySessionToken } from './verify-passphrase.js'
 
 export default function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -48,7 +32,7 @@ export default function handler(req, res) {
 
   // Verify the session token issued by /api/verify-passphrase
   const token = req.headers['x-session-token'] || ''
-  if (!isValidSessionToken(token, tokenSecret)) {
+  if (!verifySessionToken(token, tokenSecret)) {
     return res.status(401).json({ error: 'Unauthorized — valid session token required' })
   }
 

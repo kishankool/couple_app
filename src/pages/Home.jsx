@@ -11,6 +11,11 @@ import { notifyPartner } from '../push'
 
 // Compute both GM and GN streaks in one batched read.
 // Documents are keyed YYYY-MM-DD so ordering by __name__ desc gives newest-first.
+// GRACE_DAYS: consecutive missed days tolerated before the streak breaks.
+// This protects against brief outages or forgotten days without inflating the count —
+// missed days within grace are skipped but NOT added to the streak total.
+const GRACE_DAYS = 3
+
 async function computeStreaks(gmField, gnField) {
   const q = query(
     collection(db, 'good_morning'),
@@ -24,8 +29,9 @@ async function computeStreaks(gmField, gnField) {
   const byKey = {}
   docs.forEach(d => { byKey[d.id] = d.data() })
 
-  // Walk backward from yesterday counting consecutive days
+  // Walk backward from yesterday counting consecutive days with grace tolerance
   let gmStreak = 0, gnStreak = 0
+  let gmMissed = 0, gnMissed = 0  // consecutive missed days within grace window
   let gmBroken = false, gnBroken = false
   const date = new Date()
   date.setDate(date.getDate() - 1) // start from yesterday
@@ -34,12 +40,13 @@ async function computeStreaks(gmField, gnField) {
     const key = date.toLocaleDateString('en-CA')
     const data = byKey[key]
     if (!gmBroken) {
-      if (data?.[gmField]) gmStreak++
-      else gmBroken = true
+      if (data?.[gmField]) { gmStreak++; gmMissed = 0 }
+      else if (++gmMissed > GRACE_DAYS) gmBroken = true
+      // missed days within grace: skip without adding to count or breaking
     }
     if (!gnBroken) {
-      if (data?.[gnField]) gnStreak++
-      else gnBroken = true
+      if (data?.[gnField]) { gnStreak++; gnMissed = 0 }
+      else if (++gnMissed > GRACE_DAYS) gnBroken = true
     }
     if (gmBroken && gnBroken) break
     date.setDate(date.getDate() - 1)

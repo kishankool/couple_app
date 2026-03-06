@@ -5,7 +5,7 @@ import Card, { CardTitle } from '../components/Card'
 import Button from '../components/Button'
 import Confetti from '../components/Confetti'
 import { fsAdd, fsListen, fsSet, db } from '../firebase'
-import { doc, getDoc, setDoc, increment, getDocs, query, collection, orderBy, limit } from 'firebase/firestore'
+import { doc, getDoc, setDoc, increment, getDocs, collection } from 'firebase/firestore'
 import { WhoContext, ToastContext, RoleContext } from '../App'
 import { notifyPartner } from '../push'
 
@@ -17,13 +17,11 @@ import { notifyPartner } from '../push'
 const GRACE_DAYS = 3
 
 async function computeStreaks(gmField, gnField) {
-  const q = query(
-    collection(db, 'good_morning'),
-    orderBy('__name__', 'desc'),
-    limit(365)
-  )
-  const snap = await getDocs(q)
-  const docs = snap.docs // already newest → oldest
+  // Fetch all good_morning docs without orderBy — Firestore may reject
+  // orderBy('__name__') without a composite index, which would silently
+  // fail inside the .catch(). We build a byKey map and walk by date ourselves.
+  const snap = await getDocs(collection(db, 'good_morning'))
+  const docs = snap.docs
 
   // Build a map of dateKey → data for fast lookup
   const byKey = {}
@@ -37,6 +35,7 @@ async function computeStreaks(gmField, gnField) {
   date.setDate(date.getDate() - 1) // start from yesterday
 
   for (let i = 0; i < 365; i++) {
+    ``
     const key = date.toLocaleDateString('en-CA')
     const data = byKey[key]
     if (!gmBroken) {
@@ -240,7 +239,7 @@ export default function Home() {
         sessionStorage.setItem(`ka_gmStreak_${who}`, String(gmStreak))
         sessionStorage.setItem(`ka_gnStreak_${who}`, String(gnStreak))
       })
-      .catch(() => { /* keep existing displayed value on error */ })
+      .catch((err) => { console.error('computeStreaks failed:', err) /* keep existing displayed value */ })
 
     return () => { isActive = false }
   }, [todayKey, isVisitor, who])

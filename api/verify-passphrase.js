@@ -11,14 +11,30 @@ const RATE_LIMIT  = 10          // max attempts per window
 const RATE_WINDOW = 60 * 1000   // 1 minute
 const rateMap = new Map()
 
+// Periodic cleanup so rateMap never grows unbounded across many requests.
+// Runs every RATE_WINDOW; removes entries whose window has already expired.
+const cleanupInterval = setInterval(() => {
+  const now = Date.now()
+  for (const [ip, entry] of rateMap) {
+    if (now > entry.resetAt) rateMap.delete(ip)
+  }
+}, RATE_WINDOW)
+// Allow Node to exit cleanly if the module is torn down (e.g. tests)
+if (cleanupInterval.unref) cleanupInterval.unref()
+
 function isRateLimited(req) {
   const ip  = req.headers['x-forwarded-for']?.split(',')[0].trim() || 'unknown'
   const now = Date.now()
   const entry = rateMap.get(ip)
+
   if (!entry || now > entry.resetAt) {
+    // Entry is absent or expired — replace with a fresh one
     rateMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW })
+    // Schedule deletion so stale entries don't outlive the window
+    setTimeout(() => rateMap.delete(ip), RATE_WINDOW)
     return false
   }
+
   entry.count++
   return entry.count > RATE_LIMIT
 }
@@ -36,8 +52,9 @@ function safeEqual(a, b) {
   return r === 0
 }
 
-// HMAC-based session token — valid for the current 15-min window.
-// Stateless: any server instance can verify it without shared storage.
+// HMAC-based session token signed with SESSION_TOKEN_SECRET (not APP_PASSHASH).
+// Keeping the two secrets separate means compromising one doesn't compromise the other.
+// Valid for the current 15-min window; stateless — any server instance can verify it.
 function makeSessionToken(secret) {
   const win = Math.floor(Date.now() / (15 * 60 * 1000))
   return crypto.createHmac('sha256', secret).update(String(win)).digest('hex')
@@ -50,9 +67,17 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Too many attempts — wait a minute and try again' })
   }
 
+  // APP_PASSHASH — used only for passphrase comparison, never for token signing
   const expectedHash = process.env.APP_PASSHASH
   if (!expectedHash) {
     console.error('api/verify-passphrase: APP_PASSHASH env var is not set')
+    return res.status(500).json({ error: 'Server misconfigured' })
+  }
+
+  // SESSION_TOKEN_SECRET — distinct secret used only for signing/verifying session tokens
+  const tokenSecret = process.env.SESSION_TOKEN_SECRET
+  if (!tokenSecret) {
+    console.error('api/verify-passphrase: SESSION_TOKEN_SECRET env var is not set')
     return res.status(500).json({ error: 'Server misconfigured' })
   }
 
@@ -67,7 +92,7 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Wrong passphrase' })
   }
 
-  // Correct passphrase — issue a 15-min session token
-  const token = makeSessionToken(expectedHash)
+  // Correct passphrase — issue a 15-min session token signed with SESSION_TOKEN_SECRET
+  const token = makeSessionToken(tokenSecret)
   return res.status(200).json({ ok: true, sessionToken: token })
 }

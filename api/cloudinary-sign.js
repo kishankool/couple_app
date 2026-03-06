@@ -4,7 +4,7 @@
 //
 // Auth: caller must supply the X-Session-Token header issued by
 // /api/verify-passphrase after a successful passphrase check.
-// The token is a 15-min HMAC window — stateless, no DB needed.
+// Token is verified using SESSION_TOKEN_SECRET (not APP_PASSHASH).
 
 import crypto from 'crypto'
 
@@ -16,7 +16,8 @@ function safeEqual(a, b) {
   return r === 0
 }
 
-// Accept current and previous 15-min window to avoid edge-case lockouts
+// Accept current and previous 15-min window to avoid edge-case lockouts.
+// Uses SESSION_TOKEN_SECRET — distinct from APP_PASSHASH.
 function isValidSessionToken(token, secret) {
   if (!token || !secret) return false
   const win  = Math.floor(Date.now() / (15 * 60 * 1000))
@@ -28,20 +29,26 @@ function isValidSessionToken(token, secret) {
 export default function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const appPasshash = process.env.APP_PASSHASH
-  const apiSecret   = process.env.CLOUDINARY_API_SECRET
-  const apiKey      = process.env.CLOUDINARY_API_KEY
-  const cloudName   = process.env.CLOUDINARY_CLOUD_NAME
-  const preset      = process.env.CLOUDINARY_UPLOAD_PRESET
+  // SESSION_TOKEN_SECRET: used only for token verification, not for passphrase comparison
+  const tokenSecret = process.env.SESSION_TOKEN_SECRET
+  if (!tokenSecret) {
+    console.error('api/cloudinary-sign: SESSION_TOKEN_SECRET env var is not set')
+    return res.status(500).json({ error: 'Server misconfigured' })
+  }
 
-  if (!appPasshash || !apiSecret || !apiKey || !cloudName || !preset) {
-    console.error('api/cloudinary-sign: missing required env vars')
+  const apiSecret = process.env.CLOUDINARY_API_SECRET
+  const apiKey    = process.env.CLOUDINARY_API_KEY
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME
+  const preset    = process.env.CLOUDINARY_UPLOAD_PRESET
+
+  if (!apiSecret || !apiKey || !cloudName || !preset) {
+    console.error('api/cloudinary-sign: missing Cloudinary env vars')
     return res.status(500).json({ error: 'Server misconfigured' })
   }
 
   // Verify the session token issued by /api/verify-passphrase
   const token = req.headers['x-session-token'] || ''
-  if (!isValidSessionToken(token, appPasshash)) {
+  if (!isValidSessionToken(token, tokenSecret)) {
     return res.status(401).json({ error: 'Unauthorized — valid session token required' })
   }
 

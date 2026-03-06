@@ -81,25 +81,35 @@ export default function LockScreen({ onUnlock }) {
       throw new Error(`Server returned ${res.status}`)
 
     } catch (err) {
-      // ── Fallback: client-side hash check for local dev (npm run dev) ──
-      // /api/verify-passphrase is only available via `vercel dev` or in production.
-      // In plain `npm run dev` (Vite only) we fall back to comparing VITE_APP_PASSHASH.
-      console.warn('LockScreen: server verify unavailable, using local fallback.', err.message)
+      if (import.meta.env.DEV) {
+        // ── Dev fallback: client-side hash check when running plain `npm run dev` ──
+        // /api/verify-passphrase is only reachable via `vercel dev` or in production.
+        console.warn('LockScreen [dev]: server verify unavailable, using local fallback.', err.message)
 
-      const inputHash = await sha256(val)
-      if (inputHash === STORED_HASH) {
-        try {
-          await loginAnon()
-          sessionStorage.setItem('ka_unlocked', '1')
-          sessionStorage.setItem('ka_role', 'owner')
-          onUnlock('owner')
-        } catch (authErr) {
-          console.error('Firebase auth failed:', authErr)
+        const inputHash = await sha256(val)
+        if (inputHash === STORED_HASH) {
+          try {
+            await loginAnon()
+            sessionStorage.setItem('ka_unlocked', '1')
+            sessionStorage.setItem('ka_role', 'owner')
+            onUnlock('owner')
+          } catch (authErr) {
+            console.error('Firebase auth failed:', authErr)
+            setShake(true)
+            setWrong(true)
+            setTimeout(() => { setShake(false) }, 600)
+          }
+        } else {
           setShake(true)
           setWrong(true)
-          setTimeout(() => { setShake(false) }, 600)
+          setAttempts(a => a + 1)
+          setTimeout(() => { setShake(false); setChecking(false) }, 600)
         }
       } else {
+        // ── Production: never fall back to client-side verification ──
+        // If the server is unreachable, treat it as a failed unlock — do not
+        // expose the hash comparison path in a deployed build.
+        console.warn('LockScreen: server verification unavailable in production.', err.message)
         setShake(true)
         setWrong(true)
         setAttempts(a => a + 1)

@@ -64,6 +64,12 @@ export const uploadImageCloudinary = async (file) => {
     method: 'POST',
     headers: { 'X-Session-Token': sessionToken },
   })
+  if (sigRes.status === 401) {
+    // Session token is stale or missing — clear it so the next upload attempt
+    // forces the user back through the passphrase flow rather than looping on 401.
+    sessionStorage.removeItem('ka_session_token')
+    throw new Error('Session expired — please re-enter the passphrase to upload images')
+  }
   if (!sigRes.ok) throw new Error('Failed to get upload signature')
   const { signature, timestamp, apiKey, cloudName, preset } = await sigRes.json()
 

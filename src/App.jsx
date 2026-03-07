@@ -123,14 +123,16 @@ export default function App() {
 
   const NAV = isVisitor ? NAV_ALL.filter(n => !n.private) : NAV_ALL
 
-  // Unread chat counter — subscribe to recent messages at app level
+  // Unread chat counter — subscribe to recent messages at app level.
+  // Limit 300: reduces (but can't fully eliminate) under-counting when
+  // the user has been away and more than this many messages were sent.
   useEffect(() => {
     if (!unlocked || isVisitor) return
-    const q = query(collection(db, 'love_chat'), orderBy('createdAt', 'desc'), limit(100))
+    const q = query(collection(db, 'love_chat'), orderBy('createdAt', 'desc'), limit(300))
     const unsub = onSnapshot(q, snap => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse()
       setChatMessages(docs)
-    }, () => { })
+    }, err => console.error('[App] chat unread listener error:', err))
     return unsub
   }, [unlocked, isVisitor])
 

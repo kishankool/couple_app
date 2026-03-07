@@ -18,7 +18,11 @@ export function markChatSeen(who) {
 }
 export function getUnreadCount(messages, who) {
     const seen = parseInt(localStorage.getItem(getSeenKey(who)) || '0', 10)
-    if (!seen) return messages.length > 0 ? Math.min(messages.length, 99) : 0
+    // When no seen timestamp exists yet, count only partner messages (never own)
+    if (!seen) {
+        const partnerMsgs = messages.filter(m => m.who && m.who !== who)
+        return Math.min(partnerMsgs.length, 99)
+    }
     return messages.filter(m => {
         if (m.who === who) return false // my own messages don't count
         if (!m.createdAt) return false

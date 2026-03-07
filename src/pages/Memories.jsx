@@ -129,7 +129,6 @@ function CurvedPathSVG({ pathRef, dotRefs, count }) {
         pointerEvents: 'none',
         zIndex: 0,
         overflow: 'visible',
-        willChange: 'contents',
       }}
     >
       <defs>

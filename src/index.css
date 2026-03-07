@@ -356,9 +356,10 @@ textarea { resize: vertical; min-height: 80px; }
 /* ── Memory Card ── */
 .tl-card {
   width: calc(50% - 42px);
-  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  will-change: box-shadow;
 }
 .tl-left .tl-card { margin-right: auto; margin-left: 8px; }
 .tl-right .tl-card { margin-left: auto; margin-right: 8px; }
@@ -371,6 +372,7 @@ textarea { resize: vertical; min-height: 80px; }
   box-shadow: 0 2px 10px var(--shadow);
   border: 1px solid var(--border);
   overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
 }
 .tl-card-closed:active { transform: scale(0.97); }
 
@@ -404,8 +406,9 @@ textarea { resize: vertical; min-height: 80px; }
   background: #fffdf5;
   border-radius: 4px;
   padding: 8px 8px 14px;
-  box-shadow: 0 6px 24px rgba(100,60,80,0.18), 0 2px 6px rgba(0,0,0,0.06);
+  box-shadow: 0 8px 28px rgba(100,60,80,0.16), 0 2px 8px rgba(0,0,0,0.05);
   position: relative;
+  transition: box-shadow 0.3s ease;
 }
 .tl-card-expanded { position: relative; }
 .tl-card-img {
@@ -556,6 +559,12 @@ textarea { resize: vertical; min-height: 80px; }
 @keyframes img-fade-in {
   from { opacity: 0; transform: scale(0.97); }
   to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes badgePop {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

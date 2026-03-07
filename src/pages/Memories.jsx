@@ -56,6 +56,8 @@ function CurvedPathSVG({ pathRef, dotRefs, count }) {
   const [size, setSize] = useState({ w: 0, h: 0 })
 
   useEffect(() => {
+    let animFrame = null
+
     const measure = () => {
       if (!pathRef.current || count < 2) return
       const cr = pathRef.current.getBoundingClientRect()
@@ -90,13 +92,26 @@ function CurvedPathSVG({ pathRef, dotRefs, count }) {
       setSize({ w: cr.width, h: cr.height })
     }
 
-    measure()
-    // Re-measure on resize only — not after animations to avoid bumps
-    const ro = new ResizeObserver(measure)
+    // Debounced measure — prevents thrashing during card expand/collapse animations
+    const debouncedMeasure = () => {
+      if (animFrame) cancelAnimationFrame(animFrame)
+      animFrame = requestAnimationFrame(measure)
+    }
+
+    // Initial measure + after layout settles
+    debouncedMeasure()
+    const timer = setTimeout(debouncedMeasure, 500)
+
+    const ro = new ResizeObserver(debouncedMeasure)
     if (pathRef.current) ro.observe(pathRef.current)
-    // Also re-measure after layout settles (cards animate over ~400ms)
-    const timer = setTimeout(measure, 800)
-    return () => { ro.disconnect(); clearTimeout(timer) }
+    // Also observe each dot to handle card height changes
+    dotRefs.current.slice(0, count).forEach(el => { if (el) ro.observe(el.closest('.tl-card') || el) })
+
+    return () => {
+      ro.disconnect()
+      clearTimeout(timer)
+      if (animFrame) cancelAnimationFrame(animFrame)
+    }
   }, [pathRef, dotRefs, count])
 
   if (!pathD || size.h < 10) return null
@@ -114,6 +129,7 @@ function CurvedPathSVG({ pathRef, dotRefs, count }) {
         pointerEvents: 'none',
         zIndex: 0,
         overflow: 'visible',
+        willChange: 'contents',
       }}
     >
       <defs>

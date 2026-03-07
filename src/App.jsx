@@ -11,11 +11,14 @@ import Wishlist from './pages/Wishlist'
 import Calendar from './pages/Calendar'
 import TimeCapsule from './pages/TimeCapsule'
 import LoveChat from './pages/LoveChat'
+import { getUnreadCount } from './pages/LoveChat'
 import MoodChart from './pages/MoodChart'
 import Petals from './components/Petals'
 import Toast from './components/Toast'
 import Modal from './components/Modal'
 import LockScreen from './components/LockScreen'
+import { db } from './firebase'
+import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore'
 
 export const ToastContext = React.createContext(null)
 export const WhoContext = React.createContext(null)
@@ -24,7 +27,7 @@ export const RoleContext = React.createContext({ isVisitor: false })
 const NAV_ALL = [
   { path: '/', icon: '🏠', label: 'Home' },
   { path: '/memories', icon: '📸', label: 'Memories' },
-  { path: '/chat', icon: '💬', label: 'Chat', private: true },
+  { path: '/chat', icon: '💬', label: 'Chat', private: true, showBadge: true },
   { path: '/calendar', icon: '📅', label: 'Calendar', private: true },
   { path: '/more', icon: '🌹', label: 'More' },
 ]
@@ -113,11 +116,25 @@ export default function App() {
   const [showWhoModal, setShowWhoModal] = useState(false)
   const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem('ka_unlocked') === '1')
   const [isVisitor, setIsVisitor] = useState(() => sessionStorage.getItem('ka_role') === 'visitor')
+  const [chatMessages, setChatMessages] = useState([])
   const toastTimerRef = useRef(null)
   // Ref so NotificationBell can call showToast without re-renders
   const showToastRef = useRef(null)
 
   const NAV = isVisitor ? NAV_ALL.filter(n => !n.private) : NAV_ALL
+
+  // Unread chat counter — subscribe to recent messages at app level
+  useEffect(() => {
+    if (!unlocked || isVisitor) return
+    const q = query(collection(db, 'love_chat'), orderBy('createdAt', 'desc'), limit(100))
+    const unsub = onSnapshot(q, snap => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse()
+      setChatMessages(docs)
+    }, () => { })
+    return unsub
+  }, [unlocked, isVisitor])
+
+  const unreadCount = !isVisitor ? getUnreadCount(chatMessages, who) : 0
 
   const showToast = useCallback((msg) => {
     setToastMsg(msg)
@@ -226,6 +243,7 @@ export default function App() {
               <div style={styles.navInner}>
                 {NAV.map(n => {
                   const active = location.pathname === n.path
+                  const showBadge = n.showBadge && !active && unreadCount > 0
                   return (
                     <button
                       key={n.path}
@@ -239,8 +257,14 @@ export default function App() {
                         transform: active ? 'scale(1.18) translateY(-2px)' : 'scale(1)',
                         transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                         display: 'block',
+                        position: 'relative',
                       }}>
                         {n.icon}
+                        {showBadge && (
+                          <span style={styles.unreadBadge}>
+                            {unreadCount > 99 ? '99+' : unreadCount}
+                          </span>
+                        )}
                       </span>
                       <span style={{
                         fontSize: '0.58rem',
@@ -404,5 +428,26 @@ const styles = {
     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
     textAlign: 'center',
     WebkitTapHighlightColor: 'transparent',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    background: 'linear-gradient(135deg, #e74c3c, #c0392b)',
+    color: 'white',
+    fontSize: '0.5rem',
+    fontWeight: 800,
+    fontFamily: 'Lato, sans-serif',
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0 3px',
+    border: '1.5px solid white',
+    letterSpacing: 0,
+    lineHeight: 1,
+    boxShadow: '0 2px 6px rgba(231,76,60,0.4)',
   },
 }

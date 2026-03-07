@@ -11,6 +11,26 @@ import { notifyPartner } from '../push'
 
 const REACTIONS = ['💕', '😂', '🥰', '😮', '😢', '🔥']
 
+/* ─── Unread counter helpers ─── */
+function getSeenKey(who) { return `ka_chat_seen_${who}` }
+export function markChatSeen(who) {
+    localStorage.setItem(getSeenKey(who), Date.now().toString())
+}
+export function getUnreadCount(messages, who) {
+    const seen = parseInt(localStorage.getItem(getSeenKey(who)) || '0', 10)
+    // When no seen timestamp exists yet, count only partner messages (never own)
+    if (!seen) {
+        const partnerMsgs = messages.filter(m => m.who && m.who !== who)
+        return Math.min(partnerMsgs.length, 99)
+    }
+    return messages.filter(m => {
+        if (m.who === who) return false // my own messages don't count
+        if (!m.createdAt) return false
+        const ts = m.createdAt.toMillis ? m.createdAt.toMillis() : new Date(m.createdAt).getTime()
+        return ts > seen
+    }).length
+}
+
 function formatTime(ts) {
     if (!ts) return ''
     const d = ts.toDate ? ts.toDate() : new Date(ts)
@@ -53,6 +73,11 @@ export default function LoveChat() {
         }, err => console.warn('Chat listener error:', err))
         return unsub
     }, [])
+
+    // Mark as seen when chat page is open (and when new messages arrive)
+    useEffect(() => {
+        markChatSeen(who)
+    }, [messages, who])
 
     // Auto-scroll to bottom on new messages
     useEffect(() => {

@@ -564,12 +564,13 @@ export default function Home() {
       {!isVisitor && (
         <div style={styles.quickNavGrid}>
           {[
-            { icon: '💝', label: 'Love Jar', path: '/love-jar', bg: 'linear-gradient(135deg, #fde8ef, #f5dde0)' },
+
             { icon: '💬', label: 'Couple Q', path: '/questions', bg: 'linear-gradient(135deg, #e8effe, #dde8fe)' },
             { icon: '🎁', label: 'Wishlist', path: '/wishlist', bg: 'linear-gradient(135deg, #e8fde8, #d4f0d4)' },
             { icon: '💌', label: 'Capsule', path: '/capsule', bg: 'linear-gradient(135deg, #fde8ef, #f9dde8)' },
             { icon: '📊', label: 'Mood Chart', path: '/moodchart', bg: 'linear-gradient(135deg, #f3e8fd, #e8daef)' },
             { icon: '✅', label: 'Todos', path: '/todos', bg: 'linear-gradient(135deg, #e8f5e9, #d4f0d4)' },
+            { icon: '💸', label: 'Expenses', path: '/expenses', bg: 'linear-gradient(135deg, #fff5eb, #ffe8d4)' },
           ].map(item => (
             <motion.button
               key={item.path}

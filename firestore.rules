@@ -54,5 +54,7 @@ service cloud.firestore {
     match /cal_events/{docId}        { allow read, write: if isOwner(); }
     match /time_capsules/{docId}     { allow read, write: if isOwner(); }
     match /love_chat/{docId}         { allow read, write: if isOwner(); }
+    match /expenses/{docId}           { allow read, write: if isOwner(); }
+    match /settlements/{docId}        { allow read, write: if isOwner(); }
   }
 }

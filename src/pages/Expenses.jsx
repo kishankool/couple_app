@@ -104,7 +104,11 @@ export default function Expenses() {
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([key, data]) => {
         const [year, month] = key.split('-')
-        return { key, label: `${MONTHS[parseInt(month) - 1]} ${year}`, ...data }
+        const monthIdx = parseInt(month, 10)
+        const label = month && !isNaN(monthIdx) && MONTHS[monthIdx - 1]
+          ? `${MONTHS[monthIdx - 1]} ${year}`
+          : 'Unknown'
+        return { key, label, ...data }
       })
   }, [expenses])
 

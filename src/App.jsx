@@ -5,7 +5,7 @@ import Home from './pages/Home'
 import Memories from './pages/Memories'
 import Todos from './pages/Todos'
 import More from './pages/More'
-import LoveJar from './pages/LoveJar'
+
 import CoupleQuestions from './pages/CoupleQuestions'
 import Wishlist from './pages/Wishlist'
 import Calendar from './pages/Calendar'
@@ -13,6 +13,7 @@ import TimeCapsule from './pages/TimeCapsule'
 import LoveChat from './pages/LoveChat'
 import { getUnreadCount } from './pages/LoveChat'
 import MoodChart from './pages/MoodChart'
+import Expenses from './pages/Expenses'
 import Petals from './components/Petals'
 import Toast from './components/Toast'
 import Modal from './components/Modal'
@@ -233,9 +234,10 @@ export default function App() {
                   <Route path="/moodchart" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><MoodChart /></PageWrapper>} />
                   <Route path="/todos" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Todos /></PageWrapper>} />
                   <Route path="/more" element={<PageWrapper><More /></PageWrapper>} />
-                  <Route path="/love-jar" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><LoveJar /></PageWrapper>} />
+
                   <Route path="/questions" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><CoupleQuestions /></PageWrapper>} />
                   <Route path="/wishlist" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Wishlist /></PageWrapper>} />
+                  <Route path="/expenses" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Expenses /></PageWrapper>} />
                 </Routes>
               </AnimatePresence>
             </main>

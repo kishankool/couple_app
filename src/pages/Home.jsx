@@ -571,6 +571,7 @@ export default function Home() {
             { icon: '📊', label: 'Mood Chart', path: '/moodchart', bg: 'linear-gradient(135deg, #f3e8fd, #e8daef)' },
             { icon: '✅', label: 'Todos', path: '/todos', bg: 'linear-gradient(135deg, #e8f5e9, #d4f0d4)' },
             { icon: '💸', label: 'Expenses', path: '/expenses', bg: 'linear-gradient(135deg, #fff5eb, #ffe8d4)' },
+            { icon: '🐷', label: 'Savings', path: '/savings', bg: 'linear-gradient(135deg, #e8f8f0, #d4f0e0)' },
           ].map(item => (
             <motion.button
               key={item.path}

@@ -14,6 +14,7 @@ import LoveChat from './pages/LoveChat'
 import { getUnreadCount } from './pages/LoveChat'
 import MoodChart from './pages/MoodChart'
 import Expenses from './pages/Expenses'
+import Savings from './pages/Savings'
 import Petals from './components/Petals'
 import Toast from './components/Toast'
 import Modal from './components/Modal'
@@ -238,6 +239,7 @@ export default function App() {
                   <Route path="/questions" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><CoupleQuestions /></PageWrapper>} />
                   <Route path="/wishlist" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Wishlist /></PageWrapper>} />
                   <Route path="/expenses" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Expenses /></PageWrapper>} />
+                  <Route path="/savings" element={isVisitor ? <PageWrapper><Home /></PageWrapper> : <PageWrapper><Savings /></PageWrapper>} />
                 </Routes>
               </AnimatePresence>
             </main>
